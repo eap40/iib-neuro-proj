@@ -3,6 +3,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import sparse as sps
 import seaborn as sns
 import tensorflow as tf
 
@@ -36,6 +37,20 @@ sns.set()
 
 
 # pars = [v0, Jc, Jw, Wce, Wwe, Th, Tau, dTau, delay]
+
+def binary_input(M, L, kind='rand'):
+    """function to generate a binary input matrix of dimensions M x L, where M is the number of input neurons
+    and L the number of time bins. Kind argument controls the type of input e.g. randomly spaced inputs"""
+    if kind=='rand':
+        # create sparse binary array with randomly distributed values
+        sparse_array = sps.random(M, L, density=0.1, dtype='bool')
+        # convert sparse array to numpy array for later use
+        array_out = sps.csr_matrix.todense(sparse_array)
+
+    return array_out
+
+
+
 
 
 def sigm(x, tau=0):
@@ -209,25 +224,22 @@ X_rand = np.random.rand(N, L) #random input
 # plt.show()
 
 # these parameters for 2 subunits
-Jc_double = np.array([0, 1])
-M = len(Jc_double) #number of subunits
-Wce_double = np.ones([2, 2]) #both input neurons connected to both subunits
-Wwe_double = np.array([[1, -1], [1, -1]]) #weighting matrix - basically 1 excitatory and 1 inhibitory again
-
-resp_doub = sim_hLN(X=X_rand, Jc=Jc_double, Wce=Wce_double, Wwe=Wwe_double)
-
-
-plt.plot(resp_doub)
-plt.title("Two subunit soma response to random inputs")
-plt.xlabel("Time step")
-plt.ylabel("Root subunit response")
-plt.show()
+# Jc_double = np.array([0, 1])
+# M = len(Jc_double) #number of subunits
+# Wce_double = np.ones([2, 2]) #both input neurons connected to both subunits
+# Wwe_double = np.array([[1, -1], [1, -1]]) #weighting matrix - basically 1 excitatory and 1 inhibitory again
+#
+# resp_doub = sim_hLN(X=X_rand, Jc=Jc_double, Wce=Wce_double, Wwe=Wwe_double)
+#
+#
+# plt.plot(resp_doub)
+# plt.title("Two subunit soma response to random inputs")
+# plt.xlabel("Time step")
+# plt.ylabel("Root subunit response")
+# plt.show()
 
 
 
 # print(np.matmul((Wce_test * Wwe_test), X_const).shape)
-
-
-
 
 
