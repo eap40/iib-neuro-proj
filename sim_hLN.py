@@ -3,6 +3,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+from utils import *
 from scipy import sparse as sps
 import seaborn as sns
 import tensorflow as tf
@@ -38,28 +39,16 @@ sns.set()
 
 # pars = [v0, Jc, Jw, Wce, Wwe, Th, Tau, dTau, delay]
 
-def binary_input(M, L, kind='rand'):
-    """function to generate a binary input matrix of dimensions M x L, where M is the number of input neurons
-    and L the number of time bins. Kind argument controls the type of input e.g. randomly spaced inputs"""
-    if kind=='rand':
-        # create sparse binary array with randomly distributed values
-        sparse_array = sps.random(M, L, density=0.1, dtype='bool')
-        # convert sparse array to numpy array for later use
-        array_out = sps.csr_matrix.todense(sparse_array)
-
-    return array_out
 
 
 
 
 
-def sigm(x, tau=0):
-    """sigmoid function for initial global non-linearity"""
-    return 1/(1 + np.exp(-(x-tau)))
 
 
-def sim_hLN(X, Jc, Wce, Wwe, Tau=None, v0=0):
 
+def sim_hLN(X, dt, Jc, Wce, Wwe, Tau=None, v0=0, mult_inputs=False):
+    """
     # function to simulate subthreshold response of a hGLM model
     #
     # args:
@@ -86,10 +75,20 @@ def sim_hLN(X, Jc, Wce, Wwe, Tau=None, v0=0):
     # verbose: regularisation details are provided
     # calc.minis: also returns the calculated value of the individual synaptic amplitudes
     # X.ahp: output spike train convolved with the basis functions for simulating the after-spike currents
+    # mult_inputs: if true, allow an input neuron to be connected to multiple subunits
     #
     # returns: either
     # - v_soma, if vv is not provided; or
     # - the error between vv and its predicion, + regularisation terms
+    """
+
+    # if multiple inputs are not allowed, then check Wwe matrix for any multiple input cases. If some are found, print
+    # error message and exit function
+    if mult_inputs == False:
+        neuron_cons = np.sum(Wce, 1)
+        assert np.max(neuron_cons) <= 1, 'One or more neurons are connected to multiple subunits. Please revise your Wce matrix.'
+
+
 
 
     N = X.shape[0] #number of input neurons
@@ -215,7 +214,7 @@ X_rand = np.random.rand(N, L) #random input
 # Wwe_single = np.array([[1, -1]]) #weighting matrix - basically 1 excitatory and 1 inhibitory
 #
 #
-# resp_sing = sim_hLN(X=X_rand, Jc=Jc_single, Wce=Wce_single, Wwe=Wwe_single)
+# resp_sing = sim_hLN(X=X_rand, dt=10, Jc=Jc_single, Wce=Wce_single, Wwe=Wwe_single)
 #
 # plt.plot(resp_sing)
 # plt.title("Single subunit response to two random inputs")
@@ -229,7 +228,7 @@ X_rand = np.random.rand(N, L) #random input
 # Wce_double = np.ones([2, 2]) #both input neurons connected to both subunits
 # Wwe_double = np.array([[1, -1], [1, -1]]) #weighting matrix - basically 1 excitatory and 1 inhibitory again
 #
-# resp_doub = sim_hLN(X=X_rand, Jc=Jc_double, Wce=Wce_double, Wwe=Wwe_double)
+# resp_doub = sim_hLN(X=X_rand, dt=10, Jc=Jc_double, Wce=Wce_double, Wwe=Wwe_double)
 #
 #
 # plt.plot(resp_doub)
@@ -240,6 +239,27 @@ X_rand = np.random.rand(N, L) #random input
 
 
 
-# print(np.matmul((Wce_test * Wwe_test), X_const).shape)
+
+t = np.linspace(0, 100, 100)
+
+s = binary_input(1, len(t), kind='rand', delay=0)
+
+
+
+resp = convolve(s=s, dt=1, tau=5, delay=0)
+
+spikes = np.where(s==1, 1, np.nan)
+
+plt.plot(t, spikes.T, 'bo', label='spikes')
+plt.plot(t, resp.T, label='response', color='red')
+plt.plot(t, numpy_convolve(s=s, dt=1, tau=5, delay=0), '--', label='np convolve')
+# plt.plot(t, alpha_syn(t, tau=5), label='kernel')
+plt.legend()
+plt.title('Numpy convolution vs custom')
+plt.show()
+
+
+
+
 
 
