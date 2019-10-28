@@ -15,18 +15,13 @@ sns.set()
 # be careful with Python vs R indexing, could be a problem in subunit inputs CHECK THIS PROPERLY
 # get to work with single subunit, single input to begin with
 
-# simplest case parameters:
-# Jc = [0] i.e. single subunit, Jw should then be irrelevant (or 1 maybe?)
-# 1 excitatory input neuron, 1 inhibitory - READ PAPER EQUATIONS FOR IDEAS ON WHAT EXACTLY TO CODE
-# 10 time bins
-# initially define global sigmoidal function with no subunit dependent parameters
-# WE WANT TO GIVE MODEL SOME INPUT AND GET SOME OUTPUT - ONLY KEY RESULT FOR THIS WEEK!!!
+# consider changing input and weighting info to form in R library - don't want to have to convolve entire input with
+# subunit kernel every time
+
+# have a stab at tensorflow - how to learn parameters?
 
 
-# R matrix creation should be fine (non-linearity and adding of inputs from children)
-# Y matrix creation - going from spikes trains to 'signals' will need a lot of work - maybe randomise input to begin with?
-# for now should probably create Y matrix directly, then use to see if R process works
-# one time point to start with
+
 
 # DEFINE:
 # Jc, Jw, Tau matrix, Wc, gain matrix
@@ -40,14 +35,15 @@ sns.set()
 # pars = [v0, Jc, Jw, Wce, Wwe, Th, Tau, dTau, delay]
 
 
+# to define:
+# subunit parameters:
 
 
+Jc_sing = np.array([0])
+Jc_five = np.array([0, 1, 1, 1, 1])
 
 
-
-
-
-def sim_hLN(X, dt, Jc, Wce, Wwe, Tau=None, v0=0, mult_inputs=False):
+def sim_hLN(X, dt, Jc, Wce, Wwe, alpha=True, Tau=None, v0=0, mult_inputs=False):
     """
     # function to simulate subthreshold response of a hGLM model
     #
@@ -150,7 +146,18 @@ def sim_hLN(X, dt, Jc, Wce, Wwe, Tau=None, v0=0, mult_inputs=False):
         # Ww is MxN matrix of synaptic weights
         # just have excitory inputs to begin with
         if np.sum(Wce[m, :])>0: #mif subunit has any neurons connected to it
-            Y[m,:] = np.matmul((Wce[m] * Wwe[m]), X) #i.e. at each timepoint, the dot product of weights vector with input vector
+
+            # form X_conv, matrix of inputs convolved with synaptic kernel of subunit in question
+            X_conv = convolve(s=X, dt=dt, tau=5, delay=0)
+
+            if alpha==True:
+                # add convolved input to Y matrix if alpha set true
+                Y[m,:] = np.matmul((Wce[m] * Wwe[m]), X_conv) #i.e. at each timepoint, the dot product of weights vector with input vector
+
+            else:
+                # add simple binary input if not
+                Y[m,:] = np.matmul((Wce[m] * Wwe[m]), X) #i.e. at each timepoint, the dot product of weights vector with input vector
+
             #should be one weight linking each input neuron to each subunit
         #
         # if len(Wci[m])>0:
@@ -169,7 +176,6 @@ def sim_hLN(X, dt, Jc, Wce, Wwe, Tau=None, v0=0, mult_inputs=False):
     while len(subunits_done) < M: #repeat until all subunits processed
         # leaves are subunits which don't receive input from other subunits i.e. indices <= M which do not appear in Jc
         leaves = np.setdiff1d(np.arange(1, M+1, 1), Jc)
-        print(leaves)
         remain = np.setdiff1d(np.arange(1, M+1, 1), subunits_done)  # all unprocessed subunits
         # then find any subunits in both leaves and remain - if none then stop as no remaining leaves
         current_leaves = np.intersect1d(leaves, remain)
@@ -204,8 +210,11 @@ def sim_hLN(X, dt, Jc, Wce, Wwe, Tau=None, v0=0, mult_inputs=False):
 #initial parameters for:
 L = 100 #number of timesteps
 N = 2 #number of input neurons
-X_const = np.ones([N, L]) #constant input
-X_rand = np.random.rand(N, L) #random input
+X_det = binary_input(N, L, kind='delta', delay=0)
+X_rand = binary_input(N, L, kind='rand', delay=0) #random input
+
+t = np.linspace(0, 100, L)
+
 
 # these parameters for 1 subunit
 # Jc_single = np.array([0])
@@ -214,12 +223,19 @@ X_rand = np.random.rand(N, L) #random input
 # Wwe_single = np.array([[1, -1]]) #weighting matrix - basically 1 excitatory and 1 inhibitory
 #
 #
-# resp_sing = sim_hLN(X=X_rand, dt=10, Jc=Jc_single, Wce=Wce_single, Wwe=Wwe_single)
+# resp_sing = sim_hLN(X=X_det, dt=1, Jc=Jc_single, Wce=Wce_single, Wwe=Wwe_single, mult_inputs=True )
 #
-# plt.plot(resp_sing)
-# plt.title("Single subunit response to two random inputs")
+#
+# spikes=np.where(X_rand==1, 1, np.nan)
+#
+# plt.plot(t, resp_sing)
+# plt.plot(t, 0.5*spikes[0, :], 'bo', label='Neuron 1 spikes', color='green')
+# plt.plot(t, 0.5*spikes[1, :], 'bo', label='Neuron 2 spikes', color='magenta')
+#
+# plt.title("Single subunit response to two random inputs, 1 excitatory and 1 inhibitory")
 # plt.xlabel("Time step")
 # plt.ylabel("Root subunit response")
+# plt.legend()
 # plt.show()
 
 # these parameters for 2 subunits
@@ -228,35 +244,46 @@ X_rand = np.random.rand(N, L) #random input
 # Wce_double = np.ones([2, 2]) #both input neurons connected to both subunits
 # Wwe_double = np.array([[1, -1], [1, -1]]) #weighting matrix - basically 1 excitatory and 1 inhibitory again
 #
-# resp_doub = sim_hLN(X=X_rand, dt=10, Jc=Jc_double, Wce=Wce_double, Wwe=Wwe_double)
+# resp_doub = sim_hLN(X=X_det, dt=1, Jc=Jc_double, Wce=Wce_double, Wwe=Wwe_double, mult_inputs=True)
+# spikes=np.where(X_det==1, 1, np.nan)
 #
-#
-# plt.plot(resp_doub)
-# plt.title("Two subunit soma response to random inputs")
+# plt.plot(t, resp_doub)
+# plt.plot(t, 0.5*spikes[0, :], 'bo', label='Neuron 1 spikes', color='green')
+# plt.plot(t, 0.5*spikes[1, :], 'bo', label='Neuron 2 spikes', color='magenta')
+# plt.title("Two subunit soma response to random inputs, 1 excitatory and 1 inhibitory")
 # plt.xlabel("Time step")
 # plt.ylabel("Root subunit response")
+# plt.legend()
 # plt.show()
 
 
 
-
-t = np.linspace(0, 100, 100)
-
-s = binary_input(1, len(t), kind='rand', delay=0)
-
-
-
-resp = convolve(s=s, dt=1, tau=5, delay=0)
-
-spikes = np.where(s==1, 1, np.nan)
-
-plt.plot(t, spikes.T, 'bo', label='spikes')
-plt.plot(t, resp.T, label='response', color='red')
-plt.plot(t, numpy_convolve(s=s, dt=1, tau=5, delay=0), '--', label='np convolve')
-# plt.plot(t, alpha_syn(t, tau=5), label='kernel')
-plt.legend()
-plt.title('Numpy convolution vs custom')
-plt.show()
+#
+# t = np.linspace(0, 100, 100)
+# #
+# s = binary_input(2, len(t), kind='delta', delay=0)
+#
+#
+#
+# resp = convolve(s=s, dt=1, tau=5, delay=0)
+#
+# print(resp.shape)
+#
+# resp0=resp[0, :]
+# resp1=resp[1, :]
+#
+# spikes0 = np.where(s[0, :] ==1, 1, np.nan)
+# spikes1 = np.where(s[1, :] ==1, 1, np.nan)
+#
+# plt.plot(t, spikes0.T, 'bo', label='spikes0')
+# plt.plot(t, resp0.T, label='response0', color='red')
+#
+# plt.plot(t, spikes1.T, 'bo', label='spikes1', color='green')
+# plt.plot(t, resp1.T, '--', label='response1', color='magenta')
+# # plt.plot(t, numpy_convolve(s=s, dt=1, tau=5, delay=0), '--', label='np convolve')
+# # plt.plot(t, alpha_syn(t, tau=5), label='kernel')
+# plt.legend()
+# plt.show()
 
 
 
