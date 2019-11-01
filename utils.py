@@ -22,7 +22,8 @@ def binary_input(M, L, kind='rand', delay=0):
 
     if kind=='delta':
         array_out = np.zeros([M,L])
-        array_out[:, delay] = np.ones([M,1])
+        array_out[:, delay] = np.ravel(np.ones([M, 1]))
+        array_out= np.asmatrix(array_out)
 
     return array_out
 
@@ -47,20 +48,22 @@ def convolve(s, dt, tau, delay=0):
 
 
     times = dt * np.arange(0, s.shape[1], 1)
-    # find indexes of spikes in s
-    spikes = np.nonzero(s)[1]
-
-    print(spikes)
 
     # initialise response array - will add to it for each spike
-    resp=np.zeros(s.shape)
+    resp = np.zeros(s.shape)
 
-    for spike in spikes:
-        effect = alpha_syn(times-(times[spike] + delay), tau=tau)
-        resp += effect
+    for n in range(s.shape[0]):
+        print(n)
+        # find indexes of spikes in row n
+        spikes = np.nonzero(s[n])[1]
+        print(spikes)
 
+        for spike in spikes:
+            effect = alpha_syn(times-(times[spike] + delay), tau=tau)
+            resp[n, :] += effect
 
     return resp
+
 
 def numpy_convolve(s, dt, tau, delay=0):
     """function to perform built in numpy convolution and compare with custom function"""
