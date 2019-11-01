@@ -13,12 +13,12 @@ sns.set()
 # to do:
 # define all parameters required by function - simplify as much as possible to begin with
 # be careful with Python vs R indexing, could be a problem in subunit inputs CHECK THIS PROPERLY
-# get to work with single subunit, single input to begin with
-
 # consider changing input and weighting info to form in R library - don't want to have to convolve entire input with
 # subunit kernel every time
 
 # have a stab at tensorflow - how to learn parameters?
+# add double argument for fast and slow synaptic parameters
+# properly read convolution lines in R code
 
 
 
@@ -78,11 +78,11 @@ def sim_hLN(X, dt, Jc, Wce, Wwe, alpha=True, Tau=None, v0=0, mult_inputs=False):
     # - the error between vv and its predicion, + regularisation terms
     """
 
-    # if multiple inputs are not allowed, then check Wwe matrix for any multiple input cases. If some are found, print
+    # if multiple inputs are not allowed, then check Wce argument for any multiple input cases. If some are found, print
     # error message and exit function
-    if mult_inputs == False:
-        neuron_cons = np.sum(Wce, 1)
-        assert np.max(neuron_cons) <= 1, 'One or more neurons are connected to multiple subunits. Please revise your Wce matrix.'
+    # if mult_inputs == False:
+    #     neuron_cons = np.sum(Wce, 1)
+    #     assert np.max(neuron_cons) <= 1, 'One or more neurons are connected to multiple subunits. Please revise your Wce matrix.'
 
 
 
@@ -91,6 +91,7 @@ def sim_hLN(X, dt, Jc, Wce, Wwe, alpha=True, Tau=None, v0=0, mult_inputs=False):
     L = X.shape[1] #number of timesteps
 
     M = len(Jc) #number of subunits
+    Delay = np.zeros([M, 1])#default delay to 0 for all subunits
 
     Jw = np.ones([M,1]) #coupling weights 1 for all branches intially
     gain = Jw
@@ -126,7 +127,7 @@ def sim_hLN(X, dt, Jc, Wce, Wwe, alpha=True, Tau=None, v0=0, mult_inputs=False):
 
 
     # second calculate synaptic input to each dendritic branch
-    Y = np.zeros([M,L]) #this will be the matrix of inputs for each subunit at each given timestep
+    Y = np.zeros([M, L]) #this will be the matrix of inputs for each subunit at each given timestep
 
 
     for m in range(M):
@@ -145,18 +146,20 @@ def sim_hLN(X, dt, Jc, Wce, Wwe, alpha=True, Tau=None, v0=0, mult_inputs=False):
         # Wc is MxN matrix, indicating neurons connected to subunit (1 if connected, 0 if not connnected
         # Ww is MxN matrix of synaptic weights
         # just have excitory inputs to begin with
-        if np.sum(Wce[m, :])>0: #mif subunit has any neurons connected to it
 
-            # form X_conv, matrix of inputs convolved with synaptic kernel of subunit in question
-            X_conv = convolve(s=X, dt=dt, tau=5, delay=0)
+        # Wc.e, Wc.i: a list of M components. The component m is a vector indicating the neurons connected to branch m
+        # Ww.e, (Ww.e2), Ww.i: LISTS of M components indicating the synaptic weights associated to the neurons connected to branch m
+        if len(Wce[m]) > 0: #if subunit has any neurons connected to it
 
-            if alpha==True:
-                # add convolved input to Y matrix if alpha set true
-                Y[m,:] = np.matmul((Wce[m] * Wwe[m]), X_conv) #i.e. at each timepoint, the dot product of weights vector with input vector
+            for synapse, neuron in list(enumerate(Wce[m])):
 
-            else:
-                # add simple binary input if not
-                Y[m,:] = np.matmul((Wce[m] * Wwe[m]), X) #i.e. at each timepoint, the dot product of weights vector with input vector
+                if alpha:
+                    # add convolved input to Y matrix if alpha set true
+                    Y[m, :] += np.ravel(Wwe[m][synapse] * convolve(s=X[neuron], dt=dt, tau=Tau[m][synapse], delay=Delay[m]))
+
+                else:
+                    # add simple binary input if not
+                    Y[m, :] += Wwe[m][synapse] * X[neuron]
 
             #should be one weight linking each input neuron to each subunit
         #
@@ -169,8 +172,8 @@ def sim_hLN(X, dt, Jc, Wce, Wwe, alpha=True, Tau=None, v0=0, mult_inputs=False):
 
     # then start from leaves and apply nonlinearities as well as inputs from the children
 
-    R = np.zeros([M,L]) #a matrix with the activation of the subunits
-    subunits_done=np.zeros([0,0])#indices of processed subunits will be stored here
+    R = np.zeros([M, L]) #a matrix with the activation of the subunits
+    subunits_done=np.zeros([0, 0])#indices of processed subunits will be stored here
     Jc_orig = Jc.copy() #make a copy as Jc will be altered
 
     while len(subunits_done) < M: #repeat until all subunits processed
@@ -217,40 +220,42 @@ t = np.linspace(0, 100, L)
 
 
 # these parameters for 1 subunit
-# Jc_single = np.array([0])
-# M = len(Jc_single) #number of subunits
-# Wce_single = np.array([[1, 1]]) #both input neurons connected to root subunit
-# Wwe_single = np.array([[1, -1]]) #weighting matrix - basically 1 excitatory and 1 inhibitory
-#
-#
-# resp_sing = sim_hLN(X=X_det, dt=1, Jc=Jc_single, Wce=Wce_single, Wwe=Wwe_single, mult_inputs=True )
-#
-#
-# spikes=np.where(X_rand==1, 1, np.nan)
-#
-# plt.plot(t, resp_sing)
-# plt.plot(t, 0.5*spikes[0, :], 'bo', label='Neuron 1 spikes', color='green')
-# plt.plot(t, 0.5*spikes[1, :], 'bo', label='Neuron 2 spikes', color='magenta')
-#
-# plt.title("Single subunit response to two random inputs, 1 excitatory and 1 inhibitory")
-# plt.xlabel("Time step")
-# plt.ylabel("Root subunit response")
-# plt.legend()
-# plt.show()
+Jc_single = np.array([0])
+M = len(Jc_single) #number of subunits
+Wce_single = np.array([[0, 1]]) #both input neurons connected to root subunit
+Wwe_single = np.array([[1, -1]]) #weighting matrix - basically 1 excitatory and 1 inhibitory
+Tau = np.array([[5, 5]])
+
+
+
+resp_sing = sim_hLN(X=X_rand, dt=1, Jc=Jc_single, Wce=Wce_single, Wwe=Wwe_single, Tau=Tau, mult_inputs=True)
+
+
+spikes = np.where(X_rand == 1, 1, np.nan)
+
+plt.plot(t, resp_sing)
+plt.plot(t, 0.5*spikes[0, :], 'bo', label='Neuron 1 spikes', color='green')
+plt.plot(t, 0.5*spikes[1, :], 'bo', label='Neuron 2 spikes', color='magenta')
+
+plt.title("Single subunit response to two random inputs, 1 excitatory and 1 inhibitory")
+plt.xlabel("Time step")
+plt.ylabel("Root subunit response")
+plt.legend()
+plt.show()
 
 # these parameters for 2 subunits
 # Jc_double = np.array([0, 1])
 # M = len(Jc_double) #number of subunits
-# Wce_double = np.ones([2, 2]) #both input neurons connected to both subunits
+# Wce_double = np.array([[1, 1], [0, 0]]) #both input neurons connected to both subunits
 # Wwe_double = np.array([[1, -1], [1, -1]]) #weighting matrix - basically 1 excitatory and 1 inhibitory again
 #
-# resp_doub = sim_hLN(X=X_det, dt=1, Jc=Jc_double, Wce=Wce_double, Wwe=Wwe_double, mult_inputs=True)
-# spikes=np.where(X_det==1, 1, np.nan)
+# resp_doub = sim_hLN(X=X_rand, dt=1, Jc=Jc_double, Wce=Wce_double, Wwe=Wwe_double, mult_inputs=True)
+# spikes=np.where(X_rand==1, 1, np.nan)
 #
 # plt.plot(t, resp_doub)
 # plt.plot(t, 0.5*spikes[0, :], 'bo', label='Neuron 1 spikes', color='green')
 # plt.plot(t, 0.5*spikes[1, :], 'bo', label='Neuron 2 spikes', color='magenta')
-# plt.title("Two subunit soma response to random inputs, 1 excitatory and 1 inhibitory")
+# plt.title("Two subunit soma response to random inputs at end subunit, 1 excitatory and 1 inhibitory")
 # plt.xlabel("Time step")
 # plt.ylabel("Root subunit response")
 # plt.legend()
@@ -284,6 +289,8 @@ t = np.linspace(0, 100, L)
 # # plt.plot(t, alpha_syn(t, tau=5), label='kernel')
 # plt.legend()
 # plt.show()
+
+
 
 
 
