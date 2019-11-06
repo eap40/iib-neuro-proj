@@ -1,5 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
+
+sns.set()
 
 # script to generate realistic inputs for the hLN model, based on Ujfalussy R code
 
@@ -49,7 +52,8 @@ def gen_poisson_train_rescale(rates, N):
     returns array of event times"""
     Tmax = len(rates) #Tmax in ms
     mean_rate = np.mean(rates)
-    t_spikes = np.array([])
+    t_spikes = np.array([[0, 0]])
+    # print(t_spikes.shape)
 
     for cell in range(N):
         t_sp = gen_poisson_events(Tmax=Tmax, rate=mean_rate/1000) #convert from 1/s to 1/ms
@@ -60,19 +64,20 @@ def gen_poisson_train_rescale(rates, N):
                 t = np.arange(Tmax)
                 t_rescaled = np.interp(x=T_sp, xp=Cr, fp=t)
                 # later: add lines to output both event time and the neuron that produced it
-
-                t_spikes = np.append(t_spikes, t_rescaled)
+                cells = np.full(t_rescaled.shape, cell)
+                t_sp_cell = np.vstack((cells, t_rescaled)).T
+                t_spikes = np.vstack((t_spikes, t_sp_cell))
         except TypeError:
             pass
 
-    t_spikes = np.sort(t_spikes)
+    t_spikes = t_spikes[t_spikes[:, 1].argsort()]
 
     return t_spikes
 
 
 
-const_rates = [1] * 100
-
+# const_rates = [100] * 100
+#
 # print(gen_poisson_train_rescale(rates=const_rates, N=10))
 
 # plt.plot([10.54,  4.96,  1.07,  0.5,  1.82,  6.33, 11.84, 14.01, 10.54,  4.96,  1.07,  0.5,  1.82,  6.33, 11.84, 14.01])
@@ -105,7 +110,7 @@ def gen_events_sin(Tmax, alpha, beta, maxL=None):
                 rr = beta #constant rate for up to down
             p_keep = rr / max_rate
             if np.random.uniform() < p_keep:
-                print("Transition kept")
+                # print("Transition kept")
                 state = 1 - state
                 st[round(tt):] = state
                 if maxL is not None:
@@ -123,7 +128,8 @@ def gen_events_sin(Tmax, alpha, beta, maxL=None):
                 events_kept = np.append(events_kept, [[state, tt]], axis=0)
 
             else:
-                print("Transition rejected")
+                # print("Transition rejected")
+                pass
 
     return st
 
@@ -147,7 +153,7 @@ def gen_spikes_states(Tmax, N, mu, tau, x, sd=0):
     L = Tmax / dt_rates
     # create rates object using transitions described by x
     rates = np.where(x, mu[1], mu[0])
-    print(rates)
+    # print(rates)
 
     # add random elements to rates later (OU process)
 
@@ -156,12 +162,12 @@ def gen_spikes_states(Tmax, N, mu, tau, x, sd=0):
     return t_sp
 
 
-st = gen_events_sin(Tmax=100, alpha=200, beta=20, maxL=150)
-print(st)
-
-spikes = gen_spikes_states(Tmax=100, N=10, mu=Mu, tau=0, x=st)
-
-print(spikes)
+# st = gen_events_sin(Tmax=100, alpha=200, beta=20, maxL=150)
+# print(st)
+#
+# spikes = gen_spikes_states(Tmax=100, N=10, mu=Mu, tau=0, x=st)
+#
+# print(spikes)
 
 
 def gen_realistic_inputs(Tmax):
@@ -186,17 +192,34 @@ def gen_realistic_inputs(Tmax):
         # present 16 stimulus orientations
         for den in range(13):
             # generate 13 independent ensembles
-            st = gen_events_sin(Tmax=Tmax, alpha=alphas[ori-ori_dends[den] % 16 + 1], beta=beta, maxL=150)
+            st = gen_events_sin(Tmax=Tmax, alpha=alphas[int((ori-ori_dends[den]) % 16)], beta=beta, maxL=150)
+            spt_Eden = gen_spikes_states(Tmax=Tmax, N=Ensyn[den], mu=Erate, tau=0, x=st, sd=0)
+            if den > 0:
+                spt_Eden[:, 0] += np.sum(Ensyn[:den]) #i.e. number dendrites from different ensembles independently
+                spt_E = np.vstack((spt_E, spt_Eden))
+            else:
+                spt_E = spt_Eden
+
+        spt_E = spt_E[spt_E[:, 1].argsort()]
+
+        if ori == 0:
+            E_spikes = spt_E
+
+        else:
+            spt_E[:, 1] += ori * Tmax
+            E_spikes = np.vstack((E_spikes, spt_E))
+
+        print("orientation", ori, "finished")
+
+    return E_spikes
 
 
+spikes = gen_realistic_inputs(Tmax=1000)
+print(spikes.shape)
 
-
-    # given transition times, create vector of rates at each time point
-
-
-
-    # using the rates, use time rescaling process to generate spikes
-
-
-    # then adapt algorithm to be 'realistic' i.e. build in different orientations etc.
-
+plt.plot(spikes[:, 1], spikes[:, 0], marker='.', markersize=1, linestyle='')
+plt.xlabel("Time (ms)")
+plt.ylabel("Neuron number")
+plt.ylim(bottom=0)
+plt.title("Excitatory input spike trains")
+plt.show()
