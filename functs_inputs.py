@@ -52,7 +52,6 @@ def gen_poisson_train_rescale(rates, N):
                 Cr = np.cumsum(rates)
                 t = np.arange(Tmax)
                 t_rescaled = np.interp(x=T_sp, xp=Cr, fp=t)
-                # later: add lines to output both event time and the neuron that produced it
                 cells = np.full(t_rescaled.shape, cell)
                 t_sp_cell = np.vstack((cells, t_rescaled)).T
                 t_spikes = np.vstack((t_spikes, t_sp_cell))
@@ -102,36 +101,38 @@ def gen_events_sin(Tmax, alpha, beta, maxL=None):
     state = 0 #start from down state, up state is 1
     st = np.zeros(Tmax)
     events_kept = np.array([[0, 0]])
+    try:
+        if len(events) > 0:
+            for tt in events:
+                # we keep the transition with some probability - this is thinning
+                if state == 0:
+                    rr = (np.sin(tt/500 * 2 * np.pi + 150) + 1) * alpha/2
+                else:
+                    rr = beta #constant rate for up to down
+                p_keep = rr / max_rate
+                if np.random.uniform() < p_keep:
+                    # print("Transition kept")
+                    state = 1 - state
+                    st[round(tt):] = state
+                    if maxL is not None:
+                        if state == 0:
+                            # if we have just transitioned to down state, check that the time in up state did not exceed the max
+                            t_last = events_kept[-1][1]
+                            Li = tt - t_last
+                            if Li > maxL:
+                                t1 = np.random.uniform(low=t_last + Li/5, high=t_last + 2*Li/5)
+                                t2 = np.random.uniform(low=t_last + 3*Li/5, high=t_last + 4*Li/5)
+                                events_kept = np.append(events_kept, [[0, t1]], axis=0)
+                                events_kept = np.append(events_kept, [[1, t2]], axis=0)
+                                st[round(t1):round(t2)] = 0
 
-    if len(events) > 0:
-        for tt in events:
-            # we keep the transition with some probability - this is thinning
-            if state == 0:
-                rr = (np.sin(tt/500 * 2 * np.pi + 150) + 1) * alpha/2
-            else:
-                rr = beta #constant rate for up to down
-            p_keep = rr / max_rate
-            if np.random.uniform() < p_keep:
-                # print("Transition kept")
-                state = 1 - state
-                st[round(tt):] = state
-                if maxL is not None:
-                    if state == 0:
-                        # if we have just transitioned to down state, check that the time in up state did not exceed the max
-                        t_last = events_kept[-1][1]
-                        Li = tt - t_last
-                        if Li > maxL:
-                            t1 = np.random.uniform(low=t_last + Li/5, high=t_last + 2*Li/5)
-                            t2 = np.random.uniform(low=t_last + 3*Li/5, high=t_last + 4*Li/5)
-                            events_kept = np.append(events_kept, [[0, t1]], axis=0)
-                            events_kept = np.append(events_kept, [[1, t2]], axis=0)
-                            st[round(t1):round(t2)] = 0
+                    events_kept = np.append(events_kept, [[state, tt]], axis=0)
 
-                events_kept = np.append(events_kept, [[state, tt]], axis=0)
-
-            else:
-                # print("Transition rejected")
-                pass
+                else:
+                    # print("Transition rejected")
+                    pass
+    except TypeError:
+        pass
 
     return st
 
@@ -175,3 +176,28 @@ def gen_spikes_states(Tmax, N, mu, tau, x, sd):
     t_sp = gen_poisson_train_rescale(rates=rates, N=N)
 
     return t_sp
+
+
+def input_demo(Tmax, N):
+    """create plot to demonstrate input function working. Generate state intervals, then using states defined
+    by these intervals generate poisson events. Plot spiking events and actual rate on same plot (so we can
+    see more events when rate is higher)"""
+    Erate = [5, 20]
+    Esd = [2.5, 10]
+    st = gen_events_sin(Tmax=Tmax, alpha=20, beta=20, maxL=150)
+    spt = gen_spikes_states(Tmax=Tmax, N=N, mu=Erate, tau=500, x=st, sd=Esd)
+    rates = np.where(st, Erate[1], Erate[0])
+    fig, ax = plt.subplots()
+    ax.grid(False)
+    plt.scatter(spt[:, 1], spt[:, 0], s=1, marker='.')
+    rates_2d = np.tile(rates, (N, 1))
+    print(rates_2d.shape)
+    im = ax.imshow(rates_2d, aspect='auto', cmap='Reds', origin='lower')
+    cbar = plt.colorbar(im)
+    cbar.ax.set_ylabel("Firing rate (Hz)")
+    ax.set_title("Neuron spiking events as firing rate moves \n between the background and elevated state")
+    ax.set_xlabel("Time (ms)")
+    ax.set_ylabel("Neuron number")
+    plt.show()
+
+    
