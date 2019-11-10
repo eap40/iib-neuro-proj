@@ -67,30 +67,50 @@ def gen_realistic_inputs(Tmax):
     return E_spikes, I_spikes
 
 
-E_spikes, I_spikes = gen_realistic_inputs(Tmax=3000)
-print(E_spikes.shape, I_spikes.shape)
-
-Ensyn = [48, 58, 52, 34, 45, 39, 44, 68, 50, 62, 30, 60, 39]
-Ensyn_cum = np.cumsum(Ensyn)
-Ensyn_cum = Ensyn_cum.reshape(13, 1)
-print(Ensyn_cum)
-
-ens_num = np.argmax(Ensyn_cum > E_spikes[:, 0] - 1, axis=0)
-print(ens_num)
-
+# E_spikes, I_spikes = gen_realistic_inputs(Tmax=10)
+# print(E_spikes.shape, I_spikes.shape)
+#
+# Ensyn = [48, 58, 52, 34, 45, 39, 44, 68, 50, 62, 30, 60, 39]
+# Ensyn_cum = np.cumsum(Ensyn)
+# Ensyn_cum = Ensyn_cum.reshape(13, 1)
+# print(Ensyn_cum)
+#
+# ens_num = np.argmax(Ensyn_cum > E_spikes[:, 0] - 1, axis=0)
+#
 # plt.scatter(E_spikes[:, 1], E_spikes[:, 0], s=1, c=ens_num, cmap="prism", marker='.', label="Excitatory")
-plt.scatter(I_spikes[:, 1], np.sum(Ensyn) + I_spikes[:, 0], s=1, marker='.', color='black', label='Inhibitory')
-plt.xlabel("Time (ms)")
-plt.ylabel("Neuron number")
-plt.ylim(bottom=0)
-plt.xlim(left=0)
-plt.title("Input spike trains")
-plt.legend()
-plt.show()
+# plt.scatter(I_spikes[:, 1], np.sum(Ensyn) + I_spikes[:, 0], s=1, marker='.', color='black', label='Inhibitory')
+# plt.xlabel("Time (ms)")
+# plt.ylabel("Neuron number")
+# plt.ylim(bottom=0)
+# plt.xlim(left=0)
+# plt.title("Input spike trains")
+# plt.show()
 
-def spikes_to_input(spikes):
+
+
+def spikes_to_input(spikes, Tmax):
     """function to convert output from gen_realistic_inputs into a form that can be fed to the hLN model
     spikes = output from gen_realistic_inputs, a S X 2 array where S is the total number of spiking events.
      The 2nd column of S contains the time of the spiking event, and the 1st contains the number of the neuron
      that produced the spike."""
 
+    neurons = spikes[:, 0]
+    times = spikes[:, 1]
+    N = int(np.amax(neurons)) #number of neurons
+    T = Tmax  # number of timesteps
+    # empty array which will be binary, 1 indicating a spiking event at time t from neuron n
+    bin_array = np.zeros((N + 1, T))
+    times = np.around(times) # times must be integer valued for indexing, multiple spikes in same step counted as 1
+    neurons, times = neurons.astype(int), times.astype(int)
+    # where spiking event, fill binary array with 1s
+    bin_array[neurons, times] = 1
+    return bin_array
+
+
+
+E_spikes, I_spikes = gen_realistic_inputs(Tmax=1000)
+
+print(E_spikes.shape)
+
+
+print(spikes_to_input(E_spikes, Tmax=16000))
