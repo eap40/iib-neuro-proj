@@ -36,7 +36,7 @@ Jc_sing = np.array([0])
 Jc_five = np.array([0, 1, 1, 1, 1])
 
 
-def sim_hLN(X, dt, Jc, Wce, Wci, Wwe, Wwi,  Tau_e, Tau_i, Th, alpha=True, double=False, v0=0, mult_inputs=False):
+def sim_hLN(X, dt, Jc, Jw, Wce, Wci, Wwe, Wwi,  Tau_e, Tau_i, Th, alpha=True, double=False, v0=0, mult_inputs=False):
     """
     # function to simulate subthreshold response of a hGLM model
     #
@@ -87,7 +87,7 @@ def sim_hLN(X, dt, Jc, Wce, Wci, Wwe, Wwi,  Tau_e, Tau_i, Th, alpha=True, double
     M = len(Jc)  # number of subunits
     Delay = np.zeros([M, 1])  # default delay to 0 for all subunits
 
-    Jw = np.ones([M,1]) #coupling weights 1 for all branches intially
+
     gain = Jw
 
     # # first calculate baseline for all subunits, starting from the leaves - probably leave this out for first go
@@ -152,11 +152,11 @@ def sim_hLN(X, dt, Jc, Wce, Wci, Wwe, Wwi,  Tau_e, Tau_i, Th, alpha=True, double
 
             #should be one weight linking each input neuron to each subunit
         #
-        # if len(Wci[m])>0:
-        #     #if inhibitory input exists for subunit, calculate response
-        #     for synapse, neuron in list(enumerate(Wci[m])):
-        #
-        #         Y[m, :] += np.ravel(Wwi[m][synapse] * convolve(s=X[neuron], dt=dt, tau=Tau_i[m][synapse], delay=Delay[m]))
+        if len(Wci[m])>0:
+            #if inhibitory input exists for subunit, calculate response
+            for synapse, neuron in list(enumerate(Wci[m])):
+
+                Y[m, :] += int_spikes(X=X, dt=dt, Wc=Wci[m][synapse], Ww=Wwi[m][synapse], Tau=Tau_i[m][synapse], delay=Delay[m])
 
 
 
@@ -180,6 +180,8 @@ def sim_hLN(X, dt, Jc, Wce, Wci, Wwe, Wwi,  Tau_e, Tau_i, Th, alpha=True, double
         # if any found then condition
         for leaf in current_leaves:
             # apply the sigmoidal nonlinearity to the dendritic inputs for every leaf
+            # add option here for linear processing (if Th=none, just add Y row to R row)
+
             R[leaf-1, :] = sigm(Y[leaf-1, :], tau=Th[leaf-1]) #sigmoid threshold defined per subunit
 
             #add the input from the child to the parent
