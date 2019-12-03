@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy.stats import truncexpon
 
 sns.set()
 
@@ -77,15 +78,15 @@ def gen_poisson_spikes(r):
     return sp
 
 
-const_rates = [100] * 100
-#
-print(gen_poisson_spikes(r=const_rates))
+# const_rates = [100] * 100
+# #
+# print(gen_poisson_spikes(r=const_rates))
 
 # plt.plot([10.54,  4.96,  1.07,  0.5,  1.82,  6.33, 11.84, 14.01, 10.54,  4.96,  1.07,  0.5,  1.82,  6.33, 11.84, 14.01])
 # plt.show()
 
 def gen_events_sin(Tmax, alpha, beta, maxL=None):
-    """function to generate transition times between up and down states based on rules set out in Lengyel paper.
+    """function to generate transition times between up and down states based on rules set out in Ujfalussy paper.
     Tmax = time to generate transitions over
     alpha = max of the down to up transition rate in Hz
     beta = up to down transition rate in Hz
@@ -137,7 +138,75 @@ def gen_events_sin(Tmax, alpha, beta, maxL=None):
     return st
 
 
+def gen_events_sin2(Tmax, alpha, beta, maxL=None):
+    """function to generate transition times between up and down states based on rules set out in Ujfalussy paper.
+    Uses thinning to generate transitions from down to up, and then draws up state durations from a truncated
+    exponential distribution.
+    Tmax = time to generate transitions over
+    alpha = max of the down to up transition rate in Hz
+    beta = up to down transition rate in Hz
+    maxL = maximum duration of an up state, default no maximum
+    """
 
+    # convert rates from Hz to 1/ms
+    alpha /= 1000
+    beta /= 1000
+    max_rate = max(alpha, beta)
+
+    # generate events from a homogeneous poisson process with rate max_rate
+    events = gen_poisson_events(Tmax=Tmax, rate=max_rate)
+    events_kept = np.array([])
+    # use thinning to generate event times according to down to up transition rate
+    for event_time in events:
+        # rate rr is sine function of stimulus orientation and time
+        rr = (np.sin(event_time / 500 * 2 * np.pi + 150) + 1) * alpha / 2
+        p_keep = rr / max_rate # probability of keeping Poisson event at time tt
+        if np.random.uniform() < p_keep:
+            # keep event
+            events_kept = np.append(events_kept, event_time)
+
+    # events kept should now contain events generated according to inhomogeneous Poisson process, with rate defined by
+    # down to up sine function
+
+    # define truncated exponential distribution to draw up state duration times from
+    scale = 1/beta
+    trunc_expon = truncexpon(b=maxL/scale, scale=scale)
+
+    # start from down state, up state is 1
+    st = np.zeros(Tmax)  # array of states, will be binary
+
+    # first transition is down to up, with event time the first event in events_kept
+    tt = events_kept[0]
+    last_down_tt = events_kept[-1]  # last time at which there is a down to up transition
+    state = 1  # in up state after this first transition
+    durations = []
+
+    while tt < Tmax:
+
+        if state == 0:
+            # next down to up transition is first event in events_kept after the last transition time
+            if tt < last_down_tt: # if there is a down to up transition after time tt
+                next_tt = events_kept[np.argmax(events_kept > tt)]
+            else:
+                next_tt = Tmax # no more down to up transitions, so should be in down state until Tmax
+
+        elif state == 1:
+            # draw up state duration from truncated exponential distribution
+            duration = trunc_expon.rvs(1)[0]
+            durations.append(duration)
+            # print("duration:", duration)
+            next_tt = tt + duration
+
+        # print('tt:', tt, 'next_tt:,', next_tt)
+
+        # print("index:", round(tt), type(round(tt)))
+
+        st[int(round(tt)):] = state
+
+        state = 1 - state
+        tt = next_tt
+
+    return st, durations
 
 
 
@@ -166,9 +235,12 @@ def gen_spikes_states(Tmax, N, mu, tau, x, sd):
     Q = np.sqrt(2 / tau)
 
     for i in range(1, L):
-        z[i] = z[i - 1] + (z0 - z[i-1]) * dt_rates / tau + Q * np.random.normal() * np.sqrt(dt_rates)
+        z[i] = z[i - 1] + ((z0 - z[i-1]) * dt_rates / tau) + Q * np.random.normal() * np.sqrt(dt_rates)
         r0 = mu[int(x[i])]
         rates[i] = r0 + sd[int(x[i])] * z[i]
+
+    # plt.plot(z)
+    # plt.show()
 
     # random element could produce negative rates, which are not allowed so clip rates to 0 minimum
     rates = np.clip(rates, a_min=0, a_max=None)
@@ -187,11 +259,12 @@ def input_demo(Tmax, N):
     st = gen_events_sin(Tmax=Tmax, alpha=20, beta=20, maxL=150)
     spt = gen_spikes_states(Tmax=Tmax, N=N, mu=Erate, tau=500, x=st, sd=Esd)
     rates = np.where(st, Erate[1], Erate[0])
+    plt.plot(rates)
+    plt.show()
     fig, ax = plt.subplots()
     ax.grid(False)
     plt.scatter(spt[:, 1], spt[:, 0], s=1, marker='.')
     rates_2d = np.tile(rates, (N, 1))
-    print(rates_2d.shape)
     im = ax.imshow(rates_2d, aspect='auto', cmap='Reds', origin='lower')
     cbar = plt.colorbar(im)
     cbar.ax.set_ylabel("Firing rate (Hz)")
@@ -200,4 +273,3 @@ def input_demo(Tmax, N):
     ax.set_ylabel("Neuron number")
     plt.show()
 
-    
