@@ -60,6 +60,7 @@ def gen_poisson_train_rescale(rates, N):
             pass
 
     t_spikes = t_spikes[t_spikes[:, 1].argsort()]
+    t_spikes = t_spikes[1:]  #get rid of 'first' entry used to initalise t_spikes array
 
     return t_spikes
 
@@ -206,7 +207,7 @@ def gen_events_sin2(Tmax, alpha, beta, maxL=None):
         state = 1 - state
         tt = next_tt
 
-    return st, durations
+    return st
 
 
 
@@ -225,19 +226,21 @@ def gen_spikes_states(Tmax, N, mu, tau, x, sd):
     L = Tmax / dt_rates
     L = int(L)
     # create rates object using transitions described by x
-    rates = np.where(x, mu[1], mu[0])
+    rates = np.where(x, mu[1], mu[0]).astype(float)
     # print(rates)
 
     # add random elements to rates later (OU process)
     # simulate an OU process with sd = 1 and add it to the rates
     z = np.zeros(L)
-    z0 = 0
+    z0 = 0  # set baseline to 0 - OU process will tend to this
+    z[0] = np.random.normal()  # sample initial condition from stationary distribution of OU process
     Q = np.sqrt(2 / tau)
 
     for i in range(1, L):
         z[i] = z[i - 1] + ((z0 - z[i-1]) * dt_rates / tau) + Q * np.random.normal() * np.sqrt(dt_rates)
-        r0 = mu[int(x[i])]
-        rates[i] = r0 + sd[int(x[i])] * z[i]
+
+    sds = np.where(x, sd[1], sd[0])
+    rates += z * sds
 
     # plt.plot(z)
     # plt.show()
