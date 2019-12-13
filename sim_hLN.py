@@ -36,7 +36,7 @@ Jc_sing = np.array([0])
 Jc_five = np.array([0, 1, 1, 1, 1])
 
 
-def sim_hLN(X, dt, Jc, Jw, Wce, Wci, Wwe, Wwi,  Tau_e, Tau_i, Th, alpha=True, double=False, v0=0, mult_inputs=False):
+def sim_hLN(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_inputs=False):
     """
     # function to simulate subthreshold response of a hGLM model
     #
@@ -78,6 +78,8 @@ def sim_hLN(X, dt, Jc, Jw, Wce, Wci, Wwe, Wwi,  Tau_e, Tau_i, Th, alpha=True, do
     #     assert np.max(neuron_cons) <= 1, 'One or more neurons are connected to multiple subunits. Please revise your Wce matrix.'
 
     # WILL NEED MORE PARAMETER CHECKS, ERROR MESSAGES ETC HERE BEFORE FUNCTION STARTS PROPER
+    v0, Jw, Wwe, Wwi, Tau_e, Tau_i, Th = params
+
 
     N = X.shape[0] # number of input neurons
     Ne = len(Wce) # number of excitatory neurons
@@ -85,7 +87,7 @@ def sim_hLN(X, dt, Jc, Jw, Wce, Wci, Wwe, Wwi,  Tau_e, Tau_i, Th, alpha=True, do
     L = X.shape[1]  # number of timesteps
 
     M = len(Jc)  # number of subunits
-    Delay = np.zeros([M, 1])  # default delay to 0 for all subunits
+    delay = np.zeros([M, 1])  # default delay to 0 for all subunits
 
 
     gain = Jw
@@ -144,7 +146,7 @@ def sim_hLN(X, dt, Jc, Jw, Wce, Wci, Wwe, Wwi,  Tau_e, Tau_i, Th, alpha=True, do
 
                 if alpha:
                     # add convolved input to Y matrix if alpha set true
-                    Y[m, :] += int_spikes(X=X, dt=dt, Wc=Wce[m][synapse], Ww=Wwe[m][synapse], Tau=Tau_e[m][synapse], delay=Delay[m])
+                    Y[m, :] += int_spikes(X=X, dt=dt, Wc=Wce[m][synapse], Ww=Wwe[m][synapse], Tau=Tau_e[m][synapse], delay=delay[m])
 
                 else:
                     # add simple binary input if not
@@ -156,7 +158,7 @@ def sim_hLN(X, dt, Jc, Jw, Wce, Wci, Wwe, Wwi,  Tau_e, Tau_i, Th, alpha=True, do
             #if inhibitory input exists for subunit, calculate response
             for synapse, neuron in list(enumerate(Wci[m])):
 
-                Y[m, :] += int_spikes(X=X, dt=dt, Wc=Wci[m][synapse], Ww=Wwi[m][synapse], Tau=Tau_i[m][synapse], delay=Delay[m])
+                Y[m, :] += int_spikes(X=X, dt=dt, Wc=Wci[m][synapse], Ww=Wwi[m][synapse], Tau=Tau_i[m][synapse], delay=delay[m])
 
 
 
