@@ -1,5 +1,6 @@
 from functs_inputs import *
 import numpy as np
+# np.set_printoptions(threshold=1000)
 
 
 def gen_realistic_inputs(Tmax):
@@ -21,8 +22,8 @@ def gen_realistic_inputs(Tmax):
 
     Erate = [5, 20] #firing rate of excitatory inputs for low and high states
     Esd = [2.5, 10] #standard deviation of firing rate (for OU process)
-    Irate = [20, 20] #firing rate of inhibitory neurons in each state
-    N_soma = 420 #number of inhibitory neurons connected directly to soma
+    Irate = [20, 30] #firing rate of inhibitory neurons in each state
+    N_soma = 1 #number of inhibitory neurons connected directly to soma - change to 420 for real thing
 
     # generate transition times between upstate and down state
     for ori in range(16):
@@ -34,7 +35,7 @@ def gen_realistic_inputs(Tmax):
             rate_inh += Insyn[den] * (st * (Irate[1] - Irate[0]) + Irate[0])
             spt_Eden = gen_spikes_states(Tmax=Tmax, N=Ensyn[den], mu=Erate, tau=500, x=st, sd=Esd)
             if den > 0:
-                spt_Eden[:, 0] += np.sum(Ensyn[:den]) #i.e. number dendrites from different ensembles independently
+                spt_Eden[:, 0] += np.sum(Ensyn[:den])  # i.e. number dendrites from different ensembles independently
                 spt_E = np.vstack((spt_E, spt_Eden))
             else:
                 spt_E = spt_Eden
@@ -67,7 +68,7 @@ def gen_realistic_inputs(Tmax):
     return E_spikes, I_spikes
 
 
-# E_spikes, I_spikes = gen_realistic_inputs(Tmax=10)
+# E_spikes, I_spikes = gen_realistic_inputs(Tmax=1000)
 # print(E_spikes.shape, I_spikes.shape)
 #
 # Ensyn = [48, 58, 52, 34, 45, 39, 44, 68, 50, 62, 30, 60, 39]
@@ -100,7 +101,7 @@ def spikes_to_input(spikes, Tmax):
     T = Tmax  # number of timesteps
     # empty array which will be binary, 1 indicating a spiking event at time t from neuron n
     bin_array = np.zeros((N + 1, T))
-    times = np.around(times) # times must be integer valued for indexing, multiple spikes in same step counted as 1
+    times = np.floor(times) # times must be integer valued for indexing, multiple spikes in same step counted as 1
     neurons, times = neurons.astype(int), times.astype(int)
     # where spiking event, fill binary array with 1s
     bin_array[neurons, times] = 1
@@ -108,9 +109,9 @@ def spikes_to_input(spikes, Tmax):
 
 
 
-E_spikes, I_spikes = gen_realistic_inputs(Tmax=1000)
-
-print(E_spikes.shape)
-
-
-print(spikes_to_input(E_spikes, Tmax=16000))
+# E_spikes, I_spikes = gen_realistic_inputs(Tmax=1000)
+#
+# print(E_spikes.shape)
+#
+#
+# print(spikes_to_input(E_spikes, Tmax=16000))
