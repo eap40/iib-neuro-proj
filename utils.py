@@ -2,6 +2,7 @@ import numpy as np
 from scipy import sparse as sps
 import matplotlib.pyplot as plt
 import seaborn as sns
+import tensorflow as tf
 
 
 
@@ -50,32 +51,45 @@ def alpha_filt(tau, spikes, delay=0, dt=1):
     Tmax = dt * L_max
     t = np.arange(0, Tmax, dt)
     # kernel decays quickly, so only consider times up to 10 * tau after spikes
-    tf = np.arange(0, 10 * tau, dt)
-    L = len(tf)
-    filt = (tf - delay) / tau * np.exp(-(tf - delay)/tau)
-    filt = np.where(filt < 0, 0, filt)
+    tfs = tf.range(0, 10 * tau, dt)
+    L = len(tfs)
+    L = tf.cast(L, dtype=tf.int64)
+    filt = (tfs - delay) / tau * tf.math.exp(-(tfs - delay)/tau)
+    filt = tf.where(filt < 0, tf.constant(0, dtype=tf.float64), filt)
 
     # now we need to work out whether we loop over the spikes, or apply filter to whole array. This will depend on
     # how many spikes are in the train
 
     # for now assume for loop is quicker:
-    f0_spikes = np.zeros((N, L + L_max))
+    f0_spikes = tf.zeros((N, L + L_max), dtype=tf.float64)
+    # for n in range(N):
+    #     ispn = np.nonzero(np.ravel(spikes[n, :]))[0]
+    #     # print('ispn:', ispn)
+    #     if len(ispn) > 0:
+    #         for isp in ispn:
+    #             f0_spikes[n, isp:(isp + L)] += spikes[n, isp] * filt
+    # f_spikes = f0_spikes[:, :L_max]
+
+    # Tensors immutable so can't assign in for loops - use filter instead
     for n in range(N):
-        ispn = np.nonzero(np.ravel(spikes[n, :]))[0]
+        # find spike indices
+        ispn = tf.where(tf.not_equal(spikes, tf.constant(0, dtype=spikes.dtype)))[:, 1]
         # print('ispn:', ispn)
         if len(ispn) > 0:
             for isp in ispn:
-                f0_spikes[n, isp:(isp + L)] += spikes[n, isp] * filt
-
-    f_spikes = f0_spikes[:, :L_max]
-
+                # f0_spikes[isp:(isp + L)] += spikes[isp] * filt
+                # increment = np.pad(spikes[n, isp] * filt, (isp, L_max + L - isp), 'constant', constant_values=(0, 0))
+                paddings = tf.reshape([isp, L_max - isp], (1, 2))
+                increment = tf.pad(spikes[n, isp] * filt, paddings, 'CONSTANT')
+                f0_spikes += increment
+    f_spikes = f0_spikes[0, :L_max]
     return f_spikes
 
 
 
 def sigm(x, tau=0):
     """sigmoid function for initial global non-linearity"""
-    return 1/(1 + np.exp(-(x-tau)))
+    return 1/(1 + tf.exp(-(x-tau)))
 
 def convolve(s, dt, tau, delay=0):
     """function to efficiently convolve a binary input (s) with a synaptic kernel. Given the input is binary
@@ -132,24 +146,26 @@ def int_spikes(X, dt, Wc, Ww, Tau, delay):
     y = np.zeros(L)
 
     # the weights of the cells
-    w = np.zeros(N)
+    w = tf.zeros(N)
 
     # 2 different cases required: Wc is either a single value (so len is invalid) or list, for which we use len
     # replace try with if laterd
-    try:
-        n = len(Wc)
-        # more checks on Wc and Ww input parameters here
-        for i in range(n):
-            w[Wc[i]] = Ww[i]
+    # try:
+    #     n = len(Wc)
+    #     # more checks on Wc and Ww input parameters here
+    #     for i in range(n):
+    #         w[Wc[i]] = Ww[i]
+    #
+    # except (TypeError, ValueError):
+    #     # single element in Wc (so len command produces TypeError
+    #     w[Wc] = Ww
 
-    except TypeError:
-        # single element in Wc (so len command produces TypeError
-        w[Wc] = Ww
-
+    w = Ww * tf.one_hot(indices=Wc, depth=N, dtype=tf.float64)
+    w = tf.expand_dims(w, 0)
 
     # might want something here to limit in the case of very large positive or negative values
     # add up inputs going into subunit
-    x = np.matmul(w, X)
+    x = tf.matmul(w, X)
     if len(x.shape) < 2:
         # if x is 1d, reshape to 2d array (1 row, column for each timestep
         x = np.reshape(x, (1, len(x)))
@@ -160,6 +176,6 @@ def int_spikes(X, dt, Wc, Ww, Tau, delay):
     # change alpha function to filter a spike train with the kernel, not just generate the kernel.
     out = alpha_filt(tau=Tau, spikes=x, delay=delay, dt=dt)
 
-    return np.ravel(out)
+    return tf.reshape(out, [-1])
 
 
