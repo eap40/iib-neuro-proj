@@ -86,35 +86,33 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_input
         # Wc.e, Wc.i: a list of M components. The component m is a vector indicating the neurons connected to branch m
         # Ww.e, (Ww.e2), Ww.i: LISTS of M components indicating the synaptic weights associated to the neurons connected to branch m
         if len(Wce[m]) > 0:  # if subunit has any excitatory neurons connected to it
-
             # # need to swap out list(enumerate(Wce[m])) for something TF friendly
             # synapses = tf.scan(lambda a, x: a + 1, elems=Wce[m], initializer=-1)
             # synapses = tf.dtypes.cast(synapses, tf.int64)
             # list_enum = tf.stack([synapses, Wce[m]], axis=1)
             # print(list_enum)
-
+            synapse = 0
             for neuron in Wce[m]:
-                synapse = 0
                 if alpha:
                     # add convolved input to Y matrix if alpha set true
-                    increment = int_spikes(X=X, dt=dt, Wc=Wci[m][synapse], Ww=Wwi[m][synapse], Tau=Tau_i[m][synapse],
-                                      delay=delay[m])
+                    increment = int_spikes(X=X, dt=dt, Wc=Wce[m][synapse], Ww=Wwe[m][synapse], Tau=Tau_e[m][synapse],
+                                           delay=delay[m])
                     Y_m += increment
 
                 else:
                     # add simple binary input if not
                     Y_m += Wwe[m][synapse] * X[neuron]
 
-                synapse += 1 #changed to this format as tf didn't like list(enumerate) or aliases
+                synapse += 1  # changed to this format as tf didn't like list(enumerate) or aliases
 
             # should be one weight linking each input neuron to each subunit
         #
         if len(Wci[m]) > 0:
             # if inhibitory input exists for subunit, calculate response
+            synapse = 0
             for neuron in Wci[m]:
-                synapse = 0
                 Y_m += int_spikes(X=X, dt=dt, Wc=Wci[m][synapse], Ww=Wwi[m][synapse], Tau=Tau_i[m][synapse],
-                                      delay=delay[m])
+                                  delay=delay[m])
                 synapse += 1
 
         # append Y_m to list of Y_ms, then stack them all at the end of the for loop in ms
@@ -122,7 +120,6 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_input
 
     # now stack all the Y_ms we stored during the loop
     Y = tf.stack(Ym_list)
-
     # then start from leaves and apply nonlinearities as well as inputs from the children
 
     R = tf.zeros([M, L], dtype=tf.float64)  # a matrix with the activation of the subunits
@@ -131,13 +128,13 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_input
     subunits_done = tf.zeros((len(Jc), 1), dtype=tf.int64)
     Jc_orig = tf.identity(Jc)  # make a copy as Jc will be altered
 
-    while tf.math.count_nonzero(subunits_done) > 0:  # repeat until all subunits processed
+    while tf.math.count_nonzero(subunits_done) < M:  # repeat until all subunits processed
         # leaves are subunits which don't receive input from other subunits i.e. indices <= M which do not appear in Jc
         leaves = tf.sets.difference(tf.range(1, M + 1, 1, dtype=tf.int64)[None, :], Jc[None, :])
         leaves = tf.sparse.to_dense(leaves)
         remain = tf.sets.difference(tf.range(1, M + 1, 1, dtype=tf.int64)[None, :],
                                     tf.reshape(subunits_done, [-1])[None, :])
-        remain = tf.sparse.to_dense(remain) # all unprocessed subunits
+        remain = tf.sparse.to_dense(remain)  # all unprocessed subunits
         # then find any subunits in both leaves and remain - if none then stop as no remaining leaves
         current_leaves = tf.sets.intersection(leaves, remain)
         # convert from sparse to dense tensor
@@ -169,16 +166,16 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_input
 
             # Jc[leaf - 1] = 0  # subunit already processed, does not give further input
             # set Jc[leaf-1] value to zero
-            Jc -= Jc[leaf - 1] * tf.one_hot(indices=leaf-1, depth=len(Jc), dtype=tf.int64)
-            subunits_done = tf.concat([subunits_done[:leaf-1], tf.reshape(leaf, (1, 1)), subunits_done[leaf:]], axis=0)
+            Jc -= Jc[leaf - 1] * tf.one_hot(indices=leaf - 1, depth=len(Jc), dtype=tf.int64)
+            subunits_done = tf.concat([subunits_done[:leaf - 1], tf.reshape(leaf, (1, 1)), subunits_done[leaf:]],
+                                      axis=0)
             subunits_done = tf.reshape(subunits_done, (len(Jc), 1))
-            print(subunits_done)
+            tf.print(subunits_done)
 
     Jc = Jc_orig  # return to original state
 
     # should now be able to calculate response
     v_soma = Jw[0] * R[0, :] + v0
-
 
     return v_soma
 
@@ -209,7 +206,7 @@ class hLN_Model(object):
         self.Jc, self.Wci, self.Wce = Jc, Wci, Wce
         self.Jw = tf.convert_to_tensor(np.full([M,1], 1.0), dtype=tf.float64) #coupling weights 1 for all branches intially
         self.Wwe = tf.convert_to_tensor([np.full(X_e.shape[0], 1.0)], dtype=tf.float64)
-        self.Wwi = tf.convert_to_tensor([np.full(X_i.shape[0], -1.0)])
+        self.Wwi = tf.convert_to_tensor([np.full(X_i.shape[0], -1.0)], dtype=tf.float64)
         self.Tau_e = tf.convert_to_tensor([np.full(X_e.shape[0], 1.0)])
         self.Tau_i = tf.convert_to_tensor([np.full(X_i.shape[0], 1.0)])
         self.Th = tf.convert_to_tensor([1.0], dtype=tf.float64)
@@ -283,7 +280,7 @@ X_i = X_tot[629:]
 # true parameters to produce output:
 N_soma = 420
 Jc_sing = np.array([0])
-M=len(Jc_sing)
+M = len(Jc_sing)
 Jw_sing = np.full([M,1], 1) #coupling weights 1 for all branches intially
 M = len(Jc_sing) #number of subunits
 Wce_sing = [np.arange(0, X_e.shape[0], 1)] #all input excitatory neurons connected to root subunit
@@ -300,31 +297,30 @@ params_sing = [v0, Jw_sing, Wwe_sing, Wwi_sing, Tau_e, Tau_i, Th]
 # initialise model
 hLN_model = hLN_Model(Jc=Jc_sing, Wci=Wci_sing, Wce=Wce_sing)
 
-# target = sim_hLN_tf(X=X_tot, dt=1, Jc=Jc_sing, Wce=Wce_sing, Wci=Wci_sing, params=params_sing)
+# target = sim_hLN_tf(X=X_tot, dt=1, Jc=Jc_sing, Wce=Wce_sing, Wci=Wci_sing, params=hLN_model.params)
 
 # target, R, Y = hLN_model(X_tot)
 # print(Y, R, target)
 # Y = Y.numpy()
 # np.save('target.npy', target.numpy())
-# target = np.load('target.npy')
-
+target = np.load('target.npy')
+target = tf.convert_to_tensor(target, dtype=tf.float64)
 # print(Y.shape)
 # # plt.plot(target, label='target')
 # plt.plot(Y.T)
 # plt.show()
 
-plt.plot(X_tot[0])
-plt.show()
+print(target)
 
-# epochs = range(1)
-# for epoch in epochs:
-#     loss_value, grads = grad(model=hLN_model, inputs=X_tot, targets=target)
-#     print(loss_value, grads)
-#     # optimizer.apply_gradients(zip(grads, hLN_model.trainable_params))
-#     # model_output = hLN_model(X_tot)
-#     # loss_value = loss(model_output, target)
-#     # mse = (np.square(model_output - target)).mean(axis=None)
-#     # print(f"Loss value = {loss_value}, MSE = {mse}")
+epochs = range(1)
+for epoch in epochs:
+    loss_value, grads = grad(model=hLN_model, inputs=X_tot, targets=target)
+    print(loss_value, grads)
+    # optimizer.apply_gradients(zip(grads, hLN_model.trainable_params))
+    # model_output = hLN_model(X_tot)
+    # loss_value = loss(model_output, target)
+    # mse = (np.square(model_output - target)).mean(axis=None)
+    # print(f"Loss value = {loss_value}, MSE = {mse}")
 
 
 
