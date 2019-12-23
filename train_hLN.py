@@ -9,6 +9,7 @@ from tqdm import tqdm
 
 
 
+
 @tf.function
 def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_inputs=False):
     """
@@ -122,6 +123,7 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_input
     Y = tf.stack(Ym_list)
     # then start from leaves and apply nonlinearities as well as inputs from the children
 
+
     R = tf.zeros([M, L], dtype=tf.float64)  # a matrix with the activation of the subunits
     # 0 vector subunits_done - when subunit processed, set one zero value to the subunit number
     # i.e. subunit 3 processed in 3 unit structure: subunits done -> [0, 0, 3]
@@ -153,7 +155,9 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_input
             paddings = ([[leaf - 1, M - leaf], [0, 0]])
             # sigmoid threshold defined per subunit
             increment = tf.pad(tf.reshape(sigm(Y[leaf - 1, :], tau=Th[leaf - 1]), (1, L)), paddings, "CONSTANT")
-            R += tf.reshape(increment, tf.shape(R))
+            R += increment
+            R = tf.reshape(R, (M, L))
+
             # add the input from the child to the parent
             # when we process parent its input Y will be dendritic input + input from its children
             # can't assign values in a tensor so we add something of same shape as y - use paddings
@@ -212,7 +216,7 @@ class hLN_Model(object):
         self.Th = tf.convert_to_tensor([1.0], dtype=tf.float64)
         self.Delay = tf.convert_to_tensor(0)
         self.v0 = tf.convert_to_tensor(0.0, dtype=tf.float64)
-        self.params = [self.v0, self.Jw, self.Wwe, self.Wwi, self.Tau_e, self.Tau_i, self.Th]
+        self.params = (self.v0, self.Jw, self.Wwe, self.Wwi, self.Tau_e, self.Tau_i, self.Th)
         self.trainable_params = self.Jw
 
     def __call__(self, x):
@@ -231,7 +235,7 @@ def grad(model, inputs, targets):
     with tf.GradientTape() as tape:
         tape.watch(model.params)
         loss_value = loss(model(inputs), targets)
-        grads = tape.gradient(loss_value, model.params)
+        grads = tape.gradient(loss_value, sources=model.params, unconnected_gradients=tf.UnconnectedGradients.NONE)
     return loss_value, grads
 
 optimizer = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=0.1)
@@ -303,25 +307,28 @@ hLN_model = hLN_Model(Jc=Jc_sing, Wci=Wci_sing, Wce=Wce_sing)
 # print(Y, R, target)
 # Y = Y.numpy()
 # np.save('target.npy', target.numpy())
-target = np.load('target.npy')
+target = np.load('target.npy')[100:200]
 target = tf.convert_to_tensor(target, dtype=tf.float64)
 # print(Y.shape)
 # # plt.plot(target, label='target')
 # plt.plot(Y.T)
 # plt.show()
 
-print(target)
+# print(response)
 
 epochs = range(1)
 for epoch in epochs:
-    loss_value, grads = grad(model=hLN_model, inputs=X_tot, targets=target)
+    loss_value, grads = grad(model=hLN_model, inputs=X_tot[:, :100], targets=target)
+    # with tf.GradientTape() as tape:
+    #     tape.watch(hLN_model.params)
+    #     loss_value = loss(hLN_model(X_tot), target)
+    #     grads = tape.gradient(loss_value, sources=model.params, unconnected_gradients='none')
     print(loss_value, grads)
-    # optimizer.apply_gradients(zip(grads, hLN_model.trainable_params))
+    # optimizer.apply_gradients(zip(grads, hLN_model.params))
     # model_output = hLN_model(X_tot)
     # loss_value = loss(model_output, target)
     # mse = (np.square(model_output - target)).mean(axis=None)
     # print(f"Loss value = {loss_value}, MSE = {mse}")
-
 
 
 
