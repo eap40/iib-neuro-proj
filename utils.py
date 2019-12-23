@@ -80,6 +80,7 @@ def alpha_filt(tau, spikes, delay=0, dt=1):
                 # f0_spikes[isp:(isp + L)] += spikes[isp] * filt
                 # increment = np.pad(spikes[n, isp] * filt, (isp, L_max + L - isp), 'constant', constant_values=(0, 0))
                 paddings = tf.reshape([isp, L_max - isp], (1, 2))
+                paddings = tf.cast(paddings, dtype=tf.int32)
                 increment = tf.pad(spikes[n, isp] * filt, paddings, 'CONSTANT')
                 f0_spikes += increment
     f_spikes = f0_spikes[0, :L_max]
