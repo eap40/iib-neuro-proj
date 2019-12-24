@@ -63,7 +63,7 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_input
     M = len(Jc)  # number of subunits
     delay = np.zeros([M, 1])  # default delay to 0 for all subunits
 
-    gain = Jw
+    # gain = Jw
 
     # second calculate synaptic input to each dendritic branch
     # Y = tf.zeros([M, L], dtype=tf.float64)  # this will be the matrix of inputs for each subunit at each given timestep
@@ -208,16 +208,16 @@ class hLN_Model(object):
         # In practice, these should be initialized to random values (for example, with `tf.random.normal`)
         M = len(Jc)
         self.Jc, self.Wci, self.Wce = Jc, Wci, Wce
-        self.Jw = tf.convert_to_tensor(np.full([M,1], 1.0), dtype=tf.float64) #coupling weights 1 for all branches intially
-        self.Wwe = tf.convert_to_tensor([np.full(X_e.shape[0], 1.0)], dtype=tf.float64)
-        self.Wwi = tf.convert_to_tensor([np.full(X_i.shape[0], -1.0)], dtype=tf.float64)
-        self.Tau_e = tf.convert_to_tensor([np.full(X_e.shape[0], 1.0)])
-        self.Tau_i = tf.convert_to_tensor([np.full(X_i.shape[0], 1.0)])
+        self.Jw = tf.convert_to_tensor(np.full([M, 1], 1.0), dtype=tf.float64) #coupling weights 1 for all branches intially
+        self.Wwe = tf.Variable([np.full(X_e.shape[0], 1.0)], dtype=tf.float64)
+        self.Wwi = tf.Variable([np.full(X_i.shape[0], -1.0)], dtype=tf.float64)
+        self.Tau_e = tf.Variable([np.full(X_e.shape[0], 1.0)])
+        self.Tau_i = tf.Variable([np.full(X_i.shape[0], 1.0)])
         self.Th = tf.convert_to_tensor([1.0], dtype=tf.float64)
-        self.Delay = tf.convert_to_tensor(0)
-        self.v0 = tf.convert_to_tensor(0.0, dtype=tf.float64)
+        self.Delay = tf.Variable(0)
+        self.v0 = tf.Variable(0.0, dtype=tf.float64)
         self.params = (self.v0, self.Jw, self.Wwe, self.Wwi, self.Tau_e, self.Tau_i, self.Th)
-        self.trainable_params = self.Jw
+        self.trainable_params = (self.v0, self.Wwe, self.Wwi, self.Tau_e, self.Tau_i)
 
     def __call__(self, x):
         return sim_hLN_tf(X=x, dt=1, Jc=self.Jc, Wce=self.Wce, Wci=self.Wci, params=self.params)
@@ -233,9 +233,9 @@ def loss(predicted_v, target_v):
 def grad(model, inputs, targets):
     """find value of loss function and its gradient with respect to the trainable parameters of the model"""
     with tf.GradientTape() as tape:
-        tape.watch(model.params)
+        tape.watch(model.trainable_params)
         loss_value = loss(model(inputs), targets)
-        grads = tape.gradient(loss_value, sources=model.params, unconnected_gradients=tf.UnconnectedGradients.NONE)
+        grads = tape.gradient(loss_value, sources=model.trainable_params, unconnected_gradients=tf.UnconnectedGradients.NONE)
     return loss_value, grads
 
 optimizer = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=0.1)
@@ -302,12 +302,13 @@ params_sing = [v0, Jw_sing, Wwe_sing, Wwi_sing, Tau_e, Tau_i, Th]
 hLN_model = hLN_Model(Jc=Jc_sing, Wci=Wci_sing, Wce=Wce_sing)
 
 # target = sim_hLN_tf(X=X_tot, dt=1, Jc=Jc_sing, Wce=Wce_sing, Wci=Wci_sing, params=hLN_model.params)
+n_timepoints = 1000
 
 # target, R, Y = hLN_model(X_tot)
 # print(Y, R, target)
 # Y = Y.numpy()
 # np.save('target.npy', target.numpy())
-target = np.load('target.npy')[100:200]
+target = np.load('target.npy')[:n_timepoints]
 target = tf.convert_to_tensor(target, dtype=tf.float64)
 # print(Y.shape)
 # # plt.plot(target, label='target')
@@ -316,20 +317,25 @@ target = tf.convert_to_tensor(target, dtype=tf.float64)
 
 # print(response)
 
-epochs = range(1)
+epochs = range(10)
+loss_values = []
 for epoch in epochs:
-    loss_value, grads = grad(model=hLN_model, inputs=X_tot[:, :100], targets=target)
+    loss_value, grads = grad(model=hLN_model, inputs=X_tot[:, -n_timepoints:], targets=target)
     # with tf.GradientTape() as tape:
     #     tape.watch(hLN_model.params)
     #     loss_value = loss(hLN_model(X_tot), target)
     #     grads = tape.gradient(loss_value, sources=model.params, unconnected_gradients='none')
     print(loss_value, grads)
-    # optimizer.apply_gradients(zip(grads, hLN_model.params))
+    loss_values.append(loss_value.numpy())
+    optimizer.apply_gradients(zip(grads, hLN_model.trainable_params))
+
     # model_output = hLN_model(X_tot)
     # loss_value = loss(model_output, target)
     # mse = (np.square(model_output - target)).mean(axis=None)
     # print(f"Loss value = {loss_value}, MSE = {mse}")
 
+plt.plot(loss_values)
+plt.show()
 
 
 
