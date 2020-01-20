@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from tensorflow import keras
 import urllib
@@ -7,6 +8,17 @@ from sim_hLN import *
 from utils import *
 from tqdm import tqdm
 
+matplotlib.rcParams["legend.frameon"] = False
+
+# SMALL_SIZE, MEDIUM_SIZE, BIG_SIZE = 24, 24, 24
+#
+# plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+# plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+# plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+# plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+# plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+# plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+# plt.rc('figure', titlesize=BIG_SIZE)  # fontsize of the figure title
 
 
 
@@ -53,7 +65,7 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_input
     #     assert np.max(neuron_cons) <= 1, 'One or more neurons are connected to multiple subunits. Please revise your Wce matrix.'
 
     # WILL NEED MORE PARAMETER CHECKS, ERROR MESSAGES ETC HERE BEFORE FUNCTION STARTS PROPER
-    v0, Jw, Wwe, Wwi, Tau_e, Tau_i, Th = params
+    v0, Jw, Wwe, Wwi, Tau_e, Tau_i, Th, Delay = params
 
     N = X.shape[0]  # number of input neurons
     Ne = len(Wce)  # number of excitatory neurons
@@ -61,17 +73,17 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_input
     L = X.shape[1]  # number of timesteps
 
     M = len(Jc)  # number of subunits
-    delay = np.zeros([M, 1])  # default delay to 0 for all subunits
+    # delay = np.zeros([M, 1])  # default delay to 0 for all subunits
 
     # gain = Jw
 
     # second calculate synaptic input to each dendritic branch
-    # Y = tf.zeros([M, L], dtype=tf.float64)  # this will be the matrix of inputs for each subunit at each given timestep
+    # Y = tf.zeros([M, L], dtype=tf.float32)  # this will be the matrix of inputs for each subunit at each given timestep
     Ym_list = []
     for m in range(M):
 
         # create empty vector for each subunit - stack all of these at end to get full Y matrix
-        Y_m = tf.zeros(L, dtype=tf.float64)
+        Y_m = tf.zeros(L, dtype=tf.float32)
         # # subunit gain = Jw[m] * f'(0) - evaluated in the absence of inputs
         # gain[m] = Jw[m]
         #
@@ -97,7 +109,7 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_input
                 if alpha:
                     # add convolved input to Y matrix if alpha set true
                     increment = int_spikes(X=X, dt=dt, Wc=Wce[m][synapse], Ww=Wwe[m][synapse], Tau=Tau_e[m][synapse],
-                                           delay=delay[m])
+                                           delay=Delay[m])
                     Y_m += increment
 
                 else:
@@ -113,7 +125,7 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_input
             synapse = 0
             for neuron in Wci[m]:
                 Y_m += int_spikes(X=X, dt=dt, Wc=Wci[m][synapse], Ww=Wwi[m][synapse], Tau=Tau_i[m][synapse],
-                                  delay=delay[m])
+                                  delay=Delay[m])
                 synapse += 1
 
         # append Y_m to list of Y_ms, then stack them all at the end of the for loop in ms
@@ -124,7 +136,7 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_input
     # then start from leaves and apply nonlinearities as well as inputs from the children
 
 
-    R = tf.zeros([M, L], dtype=tf.float64)  # a matrix with the activation of the subunits
+    R = tf.zeros([M, L], dtype=tf.float32)  # a matrix with the activation of the subunits
     # 0 vector subunits_done - when subunit processed, set one zero value to the subunit number
     # i.e. subunit 3 processed in 3 unit structure: subunits done -> [0, 0, 3]
     subunits_done = tf.zeros((len(Jc), 1), dtype=tf.int64)
@@ -174,7 +186,7 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_input
             subunits_done = tf.concat([subunits_done[:leaf - 1], tf.reshape(leaf, (1, 1)), subunits_done[leaf:]],
                                       axis=0)
             subunits_done = tf.reshape(subunits_done, (len(Jc), 1))
-            tf.print(subunits_done)
+            # tf.print(subunits_done)
 
     Jc = Jc_orig  # return to original state
 
@@ -183,22 +195,8 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_input
 
     return v_soma
 
-class RegressionModel(object):
-  def __init__(self):
-    # Initialize the weights to `5.0` and the bias to `0.0`
-    # In practice, these should be initialized to random values (for example, with `tf.random.normal`)
-    self.W = tf.Variable(5.0)
-    self.b = tf.Variable(0.0)
-    self.params = (self.W, self.b)
 
-  def __call__(self, x):
-    return self.W * x + self.b
-
-model = RegressionModel()
-
-# assert model(3.0).numpy() == 15.0
-
-###hLN model training, following same structure as above###
+###hLN model training, following same structure as simple regression model in tensorflow examples###
 
 class hLN_Model(object):
     #   will need fleshing out/editing according to form of sim_hLN/general Python class for hLN model
@@ -208,19 +206,34 @@ class hLN_Model(object):
         # In practice, these should be initialized to random values (for example, with `tf.random.normal`)
         M = len(Jc)
         self.Jc, self.Wci, self.Wce = Jc, Wci, Wce
-        self.Jw = tf.convert_to_tensor(np.full([M, 1], 1.0), dtype=tf.float64) #coupling weights 1 for all branches intially
-        self.Wwe = tf.Variable([np.full(X_e.shape[0], 1.0)], dtype=tf.float64)
-        self.Wwi = tf.Variable([np.full(X_i.shape[0], -1.0)], dtype=tf.float64)
+        self.Jw = tf.Variable(np.full(M, 1.0), dtype=tf.float32) #coupling weights 1 for all branches intially
+        self.Wwe = tf.Variable([np.full(X_e.shape[0], 1.0)], dtype=tf.float32)
+        self.Wwi = tf.Variable([np.full(X_i.shape[0], -1.0)], dtype=tf.float32)
         self.Tau_e = tf.Variable([np.full(X_e.shape[0], 1.0)])
         self.Tau_i = tf.Variable([np.full(X_i.shape[0], 1.0)])
-        self.Th = tf.convert_to_tensor([1.0], dtype=tf.float64)
-        self.Delay = tf.Variable(0)
-        self.v0 = tf.Variable(0.0, dtype=tf.float64)
-        self.params = (self.v0, self.Jw, self.Wwe, self.Wwi, self.Tau_e, self.Tau_i, self.Th)
-        self.trainable_params = (self.v0, self.Wwe, self.Wwi, self.Tau_e, self.Tau_i)
+        self.Th = tf.Variable([1.0], dtype=tf.float32)
+        self.Delay = tf.Variable(np.zeros([M, 1]), dtype=tf.float32)
+        self.v0 = tf.Variable(0, dtype=tf.float32)
+        self.params = (self.v0, self.Jw, self.Wwe, self.Wwi, self.Tau_e, self.Tau_i, self.Th, self.Delay)
+        self.trainable_params = (self.v0, self.Jw, self.Wwe, self.Wwi, self.Tau_e, self.Tau_i, self.Delay)
 
     def __call__(self, x):
         return sim_hLN_tf(X=x, dt=1, Jc=self.Jc, Wce=self.Wce, Wci=self.Wci, params=self.params)
+
+    def randomise_parameters(self):
+        # self.Wwe = tf.Variable([np.full(X_e.shape[0], np.random.uniform(0, 2))], dtype=tf.float32)
+        self.Wwe = tf.Variable([np.random.uniform(0, 2, X_e.shape[0])], dtype=tf.float32)
+        # self.Wwi = tf.Variable([np.full(X_i.shape[0], -np.random.uniform(0, 2))], dtype=tf.float32)
+        self.Wwi = tf.Variable([np.random.uniform(-2, 0, X_i.shape[0])], dtype=tf.float32)
+        # self.Tau_e = tf.Variable([np.full(X_e.shape[0], np.random.uniform(0, 2))])
+        self.Tau_e = tf.Variable([np.random.uniform(0, 2, X_e.shape[0])], dtype=tf.float32)
+        # self.Tau_i = tf.Variable([np.full(X_i.shape[0], np.random.uniform(0, 2))])
+        self.Tau_i = tf.Variable([np.random.uniform(0, 2, X_i.shape[0])], dtype=tf.float32)
+        self.v0 = tf.Variable(np.random.uniform(-1, 1), dtype=tf.float32)
+        self.params = (self.v0, self.Jw, self.Wwe, self.Wwi, self.Tau_e, self.Tau_i, self.Th, self.Delay)
+        self.trainable_params = (self.v0, self.Jw, self.Wwe, self.Wwi, self.Tau_e, self.Tau_i, self.Delay)
+        return
+
 
 
 # define loss and gradient function
@@ -238,36 +251,8 @@ def grad(model, inputs, targets):
         grads = tape.gradient(loss_value, sources=model.trainable_params, unconnected_gradients=tf.UnconnectedGradients.NONE)
     return loss_value, grads
 
-optimizer = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=0.1)
 
-# first try new syntax with same regression problem as before - i.e. using gradient tape, optimiser etc.
-#
-# TRUE_W = 3.0
-# TRUE_b = 2.0
-# NUM_EXAMPLES = 1000
-#
-# inputs = tf.random.normal(shape=[NUM_EXAMPLES])
-# noise = tf.random.normal(shape=[NUM_EXAMPLES])
-# outputs = inputs * TRUE_W + TRUE_b + noise
-#
-# Ws, bs = [], []
-#
-# epochs = range(10)
-# for epoch in epochs:
-#     Ws.append(model.W.numpy())
-#     bs.append(model.b.numpy())
-#
-#     loss_value, grads = grad(model, inputs, outputs)
-#     print(grads)
-#     optimizer.apply_gradients(zip(grads, model.params))
-#
-# # plot regression output
-# plt.plot(epochs, Ws, 'r',
-#          epochs, bs, 'b')
-# plt.plot([TRUE_W] * len(epochs), 'r--',
-#          [TRUE_b] * len(epochs), 'b--')
-# plt.legend(['W', 'b', 'True W', 'True b'])
-# plt.show()
+
 # print(tf.autograph.to_code(sim_hLN_tf.python_function))
 
 #### now apply same format to hLN model instead of regression model ####
@@ -277,7 +262,7 @@ optimizer = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=0.1)
 # X_e = spikes_to_input(E_spikes, Tmax=48000)
 # X_i = spikes_to_input(I_spikes, Tmax=48000)
 # X_tot = np.vstack((X_e, X_i)) #this is our final input
-X_tot = np.load('real_inputs.npy')  # real inputs made earlier
+X_tot = tf.convert_to_tensor(np.load('real_inputs.npy'), dtype=tf.float32)  # real inputs made earlier
 X_e = X_tot[:629]
 X_i = X_tot[629:]
 
@@ -302,41 +287,107 @@ params_sing = [v0, Jw_sing, Wwe_sing, Wwi_sing, Tau_e, Tau_i, Th]
 hLN_model = hLN_Model(Jc=Jc_sing, Wci=Wci_sing, Wce=Wce_sing)
 
 # target = sim_hLN_tf(X=X_tot, dt=1, Jc=Jc_sing, Wce=Wce_sing, Wci=Wci_sing, params=hLN_model.params)
-n_timepoints = 1000
+n_timepoints = 500
+start = 24000
 
-# target, R, Y = hLN_model(X_tot)
+# target = hLN_model(X_tot[:n_timepoints])
 # print(Y, R, target)
 # Y = Y.numpy()
 # np.save('target.npy', target.numpy())
-target = np.load('target.npy')[:n_timepoints]
-target = tf.convert_to_tensor(target, dtype=tf.float64)
+target = np.load('target.npy')[start:start + n_timepoints]
+target = tf.convert_to_tensor(target, dtype=tf.float32)
 # print(Y.shape)
 # # plt.plot(target, label='target')
 # plt.plot(Y.T)
 # plt.show()
 
-# print(response)
+# print(target)
 
-epochs = range(10)
+# randomise parameters of model before starting training
+hLN_model.randomise_parameters()
+
+# first_output = hLN_model(X_tot[:, start:start + n_timepoints])
+
+# define optimizer
+optimizer_slow = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=0.3)
+optimizer_fast = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=3)
+
+
+epochs = range(5)
 loss_values = []
-for epoch in epochs:
-    loss_value, grads = grad(model=hLN_model, inputs=X_tot[:, -n_timepoints:], targets=target)
-    # with tf.GradientTape() as tape:
-    #     tape.watch(hLN_model.params)
-    #     loss_value = loss(hLN_model(X_tot), target)
-    #     grads = tape.gradient(loss_value, sources=model.params, unconnected_gradients='none')
-    print(loss_value, grads)
+accuracies = []
+for epoch in tqdm(epochs):
+    loss_value, grads = grad(model=hLN_model, inputs=X_tot[:, start:start + n_timepoints], targets=target)
+    accuracy = 100 * (1 - (loss_value/np.var(target)))
     loss_values.append(loss_value.numpy())
-    optimizer.apply_gradients(zip(grads, hLN_model.trainable_params))
+    accuracies.append(accuracy)
+    optimizer_slow.apply_gradients(zip(grads, hLN_model.trainable_params))
 
-    # model_output = hLN_model(X_tot)
-    # loss_value = loss(model_output, target)
-    # mse = (np.square(model_output - target)).mean(axis=None)
-    # print(f"Loss value = {loss_value}, MSE = {mse}")
+accuracies = np.clip(accuracies, a_min=0, a_max=None)
 
+plt.figure(1)
+
+plt.subplot(1, 2, 1)
 plt.plot(loss_values)
+plt.title('Loss value')
+plt.xlabel('Epoch number')
+
+plt.subplot(1, 2, 2)
+plt.plot(accuracies)
+plt.title('Prediction accuracy (%)')
+plt.xlabel('Epoch number')
+
+
+plt.tight_layout()
+
+output = hLN_model(X_tot[:, start:start + n_timepoints])
+
+plt.figure(2)
+plt.plot(target.numpy(), label='Target signal')
+plt.plot(output.numpy(), label='Model after primary training')
+# plt.plot(first_output.numpy(), label='Model before training')
+plt.xlabel('Time (s)')
+# plt.ylabel('Membrane potential (arbitrary units)')
+plt.title('Membrane potential (in arbitrary \n units) over time')
+plt.legend()
 plt.show()
 
 
-
-
+# epochs = range(5)
+# loss_values = []
+# accuracies = []
+# for epoch in tqdm(epochs):
+#     loss_value, grads = grad(model=hLN_model, inputs=X_tot[:, start:start + n_timepoints], targets=target)
+#     accuracy = 100 * (1 - (loss_value/np.var(target)))
+#     loss_values.append(loss_value.numpy())
+#     accuracies.append(accuracy)
+#     optimizer_fast.apply_gradients(zip(grads, hLN_model.trainable_params))
+#
+# accuracies = np.clip(accuracies, a_min=0, a_max=None)
+#
+# plt.figure(3)
+#
+# plt.subplot(1, 2, 1)
+# plt.plot(loss_values)
+# plt.title('Loss value')
+# plt.xlabel('Epoch number')
+#
+# plt.subplot(1, 2, 2)
+# plt.plot(accuracies)
+# plt.title('Prediction accuracy (%)')
+# plt.xlabel('Epoch number')
+#
+#
+# plt.tight_layout()
+#
+# output = hLN_model(X_tot[:, start:start + n_timepoints])
+#
+# plt.figure(4)
+# plt.plot(target.numpy(), label='Target signal')
+# plt.plot(output.numpy(), label='Model after secondary training')
+# # plt.plot(first_output.numpy(), label='Model before training')
+# plt.xlabel('Time (s)')
+# # plt.ylabel('Membrane potential (arbitrary units)')
+# plt.title('Membrane potential (in arbitrary \n units) over time')
+# plt.legend()
+# plt.show()

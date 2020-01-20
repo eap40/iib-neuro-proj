@@ -55,13 +55,13 @@ def alpha_filt(tau, spikes, delay=0, dt=1):
     L = len(tfs)
     L = tf.cast(L, dtype=tf.int64)
     filt = (tfs - delay) / tau * tf.math.exp(-(tfs - delay)/tau)
-    filt = tf.where(filt < 0, tf.constant(0, dtype=tf.float64), filt)
+    filt = tf.where(filt < 0, tf.constant(0, dtype=tf.float32), filt)
 
     # now we need to work out whether we loop over the spikes, or apply filter to whole array. This will depend on
     # how many spikes are in the train
 
     # for now assume for loop is quicker:
-    f0_spikes = tf.zeros((N, L + L_max), dtype=tf.float64)
+    f0_spikes = tf.zeros((N, L + L_max), dtype=tf.float32)
     # for n in range(N):
     #     ispn = np.nonzero(np.ravel(spikes[n, :]))[0]
     #     # print('ispn:', ispn)
@@ -161,7 +161,7 @@ def int_spikes(X, dt, Wc, Ww, Tau, delay):
     #     # single element in Wc (so len command produces TypeError
     #     w[Wc] = Ww
 
-    w = Ww * tf.one_hot(indices=Wc, depth=N, dtype=tf.float64)
+    w = Ww * tf.one_hot(indices=Wc, depth=N, dtype=tf.float32)
     w = tf.expand_dims(w, 0)
 
     # might want something here to limit in the case of very large positive or negative values
