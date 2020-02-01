@@ -2,6 +2,7 @@
 # first draft should be simplest skeleton of Ujfalussy full R script that can take inputs and produce and output
 
 import numpy as np
+import tensorflow as tf
 import matplotlib.pyplot as plt
 from utils import *
 from scipy import sparse as sps
@@ -9,21 +10,6 @@ import seaborn as sns
 from gen_inputs import *
 
 sns.set()
-
-# to do:
-# define all parameters required by function - simplify as much as possible to begin with
-# be careful with Python vs R indexing, could be a problem in subunit inputs CHECK THIS PROPERLY
-
-
-
-# DEFINE:
-# Jc, Jw, Tau matrix, Wc, gain matrix
-
-# RANDOMISE:
-# Ww (weights), X?
-# could be helpful to define X to check if soma output is plausible.
-
-
 
 # pars = [v0, Jc, Jw, Wce, Wwe, Th, Tau, dTau, delay]
 
@@ -36,9 +22,11 @@ Jc_sing = np.array([0])
 Jc_five = np.array([0, 1, 1, 1, 1])
 
 
-def sim_hLN(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_inputs=False):
+
+@tf.function
+def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, sig_on, alpha=True, double=False, mult_inputs=False):
     """
-    # function to simulate subthreshold response of a hGLM model
+    # function to simulate subthreshold response of a hGLM model, with TensorFlow friendly functions
     #
     # args:
     # X: NxT binary input matrix of presynaptic spikes; N: # of input neurons; T: # of timesteps
@@ -78,54 +66,25 @@ def sim_hLN(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_inputs=F
     #     assert np.max(neuron_cons) <= 1, 'One or more neurons are connected to multiple subunits. Please revise your Wce matrix.'
 
     # WILL NEED MORE PARAMETER CHECKS, ERROR MESSAGES ETC HERE BEFORE FUNCTION STARTS PROPER
-    v0, Jw, Wwe, Wwi, Tau_e, Tau_i, Th = params
+    v0, Jw, Wwe, Wwi, Tau_e, Tau_i, Th, Delay = params
 
-
-    N = X.shape[0] # number of input neurons
-    Ne = len(Wce) # number of excitatory neurons
-    Ni = len(Wci) # number of inhibitory neurons
+    N = X.shape[0]  # number of input neurons
+    Ne = len(Wce)  # number of excitatory neurons
+    Ni = len(Wci)  # number of inhibitory neurons
     L = X.shape[1]  # number of timesteps
 
     M = len(Jc)  # number of subunits
-    delay = np.zeros([M, 1])  # default delay to 0 for all subunits
+    # delay = np.zeros([M, 1])  # default delay to 0 for all subunits
 
-
-    gain = Jw
-
-    # # first calculate baseline for all subunits, starting from the leaves - probably leave this out for first go
-    # subunits_done=np.zeros([0,0])#indices of processed subunits will be stored here
-    #
-    # Jc_orig = Jc #make copy as Jc will be altered
-    #
-    # while len(subunits_done) < M: #repeat until all subunits processed
-    #   # leaves are subunits which don't receive input from other subunits i.e. indices <= M which do not appear in Jc
-    #   leaves = np.setdiff1d(np.arange(0, M, 1), Jc)
-    #   remain = np.setdiff1d(np.arange(0, M, 1), subunits_done)#all unprocessed subunits
-    #   #then find any subunits in both leaves and remain - if none then stop as no remaining leaves
-    #   current_leaves = np.intersect1d(leaves, remain)
-    #   if len(current_leaves)==0:
-    #     # no further leaves found, end loop
-    #     break
-    #
-    #
-    #   #if any found then condition
-    #   for leaf in current_leaves:
-    #        #find children of leaf
-    #        children =np.where(Jc==leaf)[0]
-    #        if len(children) > 0:
-    #            for child in children:
-    #                # update baseline response - child is an integer representing the index of a subunit
-    #                baseline[leaf] += Jw[child] * sigm(baseline[child], c=Th[child])
-    #                Jc[leaf]=None #subunit already processed, does not give further input
-    #                subunits_done = np.append(subunits_done, leaf)
-    #
-    # Jc = Jc_orig #reset Jc
-
+    # gain = Jw
 
     # second calculate synaptic input to each dendritic branch
-    Y = np.zeros([M, L]) #this will be the matrix of inputs for each subunit at each given timestep
-
+    # Y = tf.zeros([M, L], dtype=tf.float32)  # this will be the matrix of inputs for each subunit at each given timestep
+    Ym_list = []
     for m in range(M):
+
+        # create empty vector for each subunit - stack all of these at end to get full Y matrix
+        Y_m = tf.zeros(L, dtype=tf.float32)
         # # subunit gain = Jw[m] * f'(0) - evaluated in the absence of inputs
         # gain[m] = Jw[m]
         #
@@ -140,41 +99,63 @@ def sim_hLN(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_inputs=F
 
         # Wc.e, Wc.i: a list of M components. The component m is a vector indicating the neurons connected to branch m
         # Ww.e, (Ww.e2), Ww.i: LISTS of M components indicating the synaptic weights associated to the neurons connected to branch m
-        if len(Wce[m]) > 0:# if subunit has any excitatory neurons connected to it
-
-            for synapse, neuron in list(enumerate(Wce[m])):
-
+        if len(Wce[m]) > 0:  # if subunit has any excitatory neurons connected to it
+            # # need to swap out list(enumerate(Wce[m])) for something TF friendly
+            # synapses = tf.scan(lambda a, x: a + 1, elems=Wce[m], initializer=-1)
+            # synapses = tf.dtypes.cast(synapses, tf.int64)
+            # list_enum = tf.stack([synapses, Wce[m]], axis=1)
+            # print(list_enum)
+            synapse = 0
+            for neuron in Wce[m]:
                 if alpha:
                     # add convolved input to Y matrix if alpha set true
-                    Y[m, :] += int_spikes(X=X, dt=dt, Wc=Wce[m][synapse], Ww=Wwe[m][synapse], Tau=Tau_e[m][synapse], delay=delay[m])
+                    increment = int_spikes(X=X, dt=dt, Wc=Wce[m][synapse], Ww=Wwe[m][synapse], Tau=Tau_e[m][synapse],
+                                           delay=Delay[m])
+                    Y_m += increment
 
                 else:
                     # add simple binary input if not
-                    Y[m, :] += Wwe[m][synapse] * X[neuron]
+                    Y_m += Wwe[m][synapse] * X[neuron]
 
-            #should be one weight linking each input neuron to each subunit
+                synapse += 1  # changed to this format as tf didn't like list(enumerate) or aliases
+
+            # should be one weight linking each input neuron to each subunit
         #
-        if len(Wci[m])>0:
-            #if inhibitory input exists for subunit, calculate response
-            for synapse, neuron in list(enumerate(Wci[m])):
+        if len(Wci[m]) > 0:
+            # if inhibitory input exists for subunit, calculate response
+            synapse = 0
+            for neuron in Wci[m]:
+                Y_m += int_spikes(X=X, dt=dt, Wc=Wci[m][synapse], Ww=Wwi[m][synapse], Tau=Tau_i[m][synapse],
+                                  delay=Delay[m])
+                synapse += 1
 
-                Y[m, :] += int_spikes(X=X, dt=dt, Wc=Wci[m][synapse], Ww=Wwi[m][synapse], Tau=Tau_i[m][synapse], delay=delay[m])
+        # append Y_m to list of Y_ms, then stack them all at the end of the for loop in ms
+        Ym_list.append(Y_m)
 
-
-
-
+    # now stack all the Y_ms we stored during the loop
+    Y = tf.stack(Ym_list)
     # then start from leaves and apply nonlinearities as well as inputs from the children
 
-    R = np.zeros([M, L]) #a matrix with the activation of the subunits
-    subunits_done=np.zeros([0, 0])#indices of processed subunits will be stored here
-    Jc_orig = Jc.copy() #make a copy as Jc will be altered
 
-    while len(subunits_done) < M: #repeat until all subunits processed
+    R = tf.zeros([M, L], dtype=tf.float32)  # a matrix with the activation of the subunits
+    # 0 vector subunits_done - when subunit processed, set one zero value to the subunit number
+    # i.e. subunit 3 processed in 3 unit structure: subunits done -> [0, 0, 3]
+    subunits_done = tf.zeros((len(Jc), 1), dtype=tf.int64)
+    Jc_orig = tf.identity(Jc)  # make a copy as Jc will be altered
+
+    while tf.math.count_nonzero(subunits_done) < M:  # repeat until all subunits processed
         # leaves are subunits which don't receive input from other subunits i.e. indices <= M which do not appear in Jc
-        leaves = np.setdiff1d(np.arange(1, M+1, 1), Jc)
-        remain = np.setdiff1d(np.arange(1, M+1, 1), subunits_done)  # all unprocessed subunits
+        leaves = tf.sets.difference(tf.range(1, M + 1, 1, dtype=tf.int64)[None, :], Jc[None, :])
+        leaves = tf.sparse.to_dense(leaves)
+        remain = tf.sets.difference(tf.range(1, M + 1, 1, dtype=tf.int64)[None, :],
+                                    tf.reshape(subunits_done, [-1])[None, :])
+        remain = tf.sparse.to_dense(remain)  # all unprocessed subunits
         # then find any subunits in both leaves and remain - if none then stop as no remaining leaves
-        current_leaves = np.intersect1d(leaves, remain)
+        current_leaves = tf.sets.intersection(leaves, remain)
+        # convert from sparse to dense tensor
+        current_leaves = tf.sparse.to_dense(current_leaves)
+        # reshape to 1D tensor so we can iterate over it, and use elements as indices
+        current_leaves = tf.reshape(current_leaves, [-1])
         if len(current_leaves) == 0:
             # no further leaves found, end loop
             break
@@ -183,90 +164,42 @@ def sim_hLN(X, dt, Jc, Wce, Wci, params, alpha=True, double=False, mult_inputs=F
         for leaf in current_leaves:
             # apply the sigmoidal nonlinearity to the dendritic inputs for every leaf
             # add option here for linear processing (if Th=none, just add Y row to R row)
+            # define paddings - this way we can add non linearity output to whole R Tensor instead of assigning 1 row
+            paddings = ([[leaf - 1, M - leaf], [0, 0]])
 
-            R[leaf-1, :] = sigm(Y[leaf-1, :], tau=Th[leaf-1]) #sigmoid threshold defined per subunit
+            # sigmoid threshold defined per subunit - apply only if subunit defined as non-linear
+            if sig_on[leaf-1]:  # if subunit is nonlinear
+                increment = tf.pad(tf.reshape(sigm(Y[leaf - 1, :], tau=Th[leaf - 1]), (1, L)), paddings, "CONSTANT")
+            else:  # subunit is just linear
+                increment = tf.pad(tf.reshape(Y[leaf - 1, :], (1, L)), paddings, "CONSTANT")
 
-            #add the input from the child to the parent
+            R += increment
+            R = tf.reshape(R, (M, L))
+
+            # add the input from the child to the parent
             # when we process parent its input Y will be dendritic input + input from its children
-            parent = Jc[leaf-1]
+            # can't assign values in a tensor so we add something of same shape as y - use paddings
+            parent = Jc[leaf - 1]
             if parent > 0:
-                Y[parent-1, :] += Jw[leaf-1] * R[leaf-1, :]
+                increment = tf.reshape(Jw[leaf - 1] * R[leaf - 1, :], (1, L))
+                paddings = ([[parent - 1, M - parent], [0, 0]])
+                Y += tf.pad(increment, paddings, "CONSTANT")
+                Y = tf.reshape(Y, (M, L))
 
-            Jc[leaf-1] = 0  # subunit already processed, does not give further input
-            subunits_done = np.append(subunits_done, leaf)
-            print(subunits_done)
+            # Jc[leaf - 1] = 0  # subunit already processed, does not give further input
+            # set Jc[leaf-1] value to zero
+            Jc -= Jc[leaf - 1] * tf.one_hot(indices=leaf - 1, depth=len(Jc), dtype=tf.int64)
+            subunits_done = tf.concat([subunits_done[:leaf - 1], tf.reshape(leaf, (1, 1)), subunits_done[leaf:]],
+                                      axis=0)
+            subunits_done = tf.reshape(subunits_done, (len(Jc), 1))
+            # tf.print(subunits_done)
 
-    Jc = Jc_orig #return to original state
+    Jc = Jc_orig  # return to original state
 
     # should now be able to calculate response
     v_soma = Jw[0] * R[0, :] + v0
 
-
     return v_soma
-
-
-#initial parameters for:
-L = 100 #number of timesteps
-# N = 2 #number of input neurons
-# X_det = binary_input(N, L, kind='delta', delay=0)
-# X_rand = binary_input(N, L, kind='rand', delay=0) #random input
-#
-# t = np.linspace(0, 100, L)
-#
-# spikes = np.where(X_rand == 1, 1, np.nan)
-# conv = convolve(s=X_rand[0], dt=1, tau=1, delay=0)
-#
-# plt.plot(t, spikes[0, :], 'o', label='spikes')
-# plt.plot(t, conv.T)
-# plt.show()
-
-
-
-
-# # try inputting realistic input to model, plot response
-# E_spikes, I_spikes = gen_realistic_inputs(Tmax=3000)
-# X_e = spikes_to_input(E_spikes, Tmax=48001)
-# X_i = spikes_to_input(I_spikes, Tmax=48001)
-#
-# # these parameters for 1 subunit
-# Jc_sing = np.array([0])
-# M = len(Jc_sing) #number of subunits
-# Wce_sing = [np.arange(0, X_e.shape[0], 1)] #all input neurons connected to root subunit
-# Wwe_sing = [np.ones(X_e.shape[0])] #weighting matrix - all neurons connected with weight 1 initially
-# Tau_e = [np.full(X_e.shape[0], 1)] #all excitatory time constants 1
-# Th = [[0]] #no offset in all sigmoids
-#
-#
-# resp_sing = sim_hLN(X=X_e, dt=1, Jc=Jc_sing, Wce=Wce_sing, Wwe=Wwe_sing, Wci=[[0]], Wwi=[[0]], Tau_e=Tau_e, Tau_i=[], Th=Th, mult_inputs=True)
-#
-# plt.plot(resp_sing)
-# # plt.plot(t, 0.5*spikes[0, :], 'bo', label='Neuron 1 spikes', color='green')
-# # plt.plot(t, 0.5*spikes[1, :], 'bo', label='Neuron 2 spikes', color='magenta')
-#
-# plt.title("Single subunit response to two random inputs, 1 excitatory and 1 inhibitory")
-# plt.xlabel("Time step")
-# plt.ylabel("Root subunit response")
-# plt.legend()
-# plt.show()
-
-# these parameters for 2 subunits
-# Jc_double = np.array([0, 1])
-# M = len(Jc_double) #number of subunits
-# Wce_double = np.array([[1, 1], [0, 0]]) #both input neurons connected to both subunits
-# Wwe_double = np.array([[1, -1], [1, -1]]) #weighting matrix - basically 1 excitatory and 1 inhibitory again
-#
-# resp_doub = sim_hLN(X=X_rand, dt=1, Jc=Jc_double, Wce=Wce_double, Wwe=Wwe_double, mult_inputs=True)
-# spikes=np.where(X_rand==1, 1, np.nan)
-#
-# plt.plot(t, resp_doub)
-# plt.plot(t, 0.5*spikes[0, :], 'bo', label='Neuron 1 spikes', color='green')
-# plt.plot(t, 0.5*spikes[1, :], 'bo', label='Neuron 2 spikes', color='magenta')
-# plt.title("Two subunit soma response to random inputs at end subunit, 1 excitatory and 1 inhibitory")
-# plt.xlabel("Time step")
-# plt.ylabel("Root subunit response")
-# plt.legend()
-# plt.show()
-
 
 
 
