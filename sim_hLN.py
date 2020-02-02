@@ -66,7 +66,10 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, sig_on, alpha=True, double=False, mu
     #     assert np.max(neuron_cons) <= 1, 'One or more neurons are connected to multiple subunits. Please revise your Wce matrix.'
 
     # WILL NEED MORE PARAMETER CHECKS, ERROR MESSAGES ETC HERE BEFORE FUNCTION STARTS PROPER
-    v0, Jw, Wwe, Wwi, Tau_e, Tau_i, Th, Delay = params
+    v0, log_Jw, Wwe, Wwi, log_Tau_e, log_Tau_i, Th, log_Delay = params
+
+    # these parameters defined by their logs to ensure positivity - convert here
+    Jw, Tau_e, Tau_i, Delay = tf.exp(log_Jw), tf.exp(log_Tau_e), tf.exp(log_Tau_i), tf.exp(log_Delay)
 
     N = X.shape[0]  # number of input neurons
     Ne = len(Wce)  # number of excitatory neurons
