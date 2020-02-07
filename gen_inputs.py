@@ -23,7 +23,7 @@ def gen_realistic_inputs(Tmax):
     Erate = [5, 20] #firing rate of excitatory inputs for low and high states
     Esd = [2.5, 10] #standard deviation of firing rate (for OU process)
     Irate = [20, 30] #firing rate of inhibitory neurons in each state
-    N_soma = 1 #number of inhibitory neurons connected directly to soma - change to 420 for real thing
+    N_soma = 420 #number of inhibitory neurons connected directly to soma - change to 420 for real thing
 
     # generate transition times between upstate and down state
     for ori in range(16):
