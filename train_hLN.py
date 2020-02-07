@@ -26,7 +26,7 @@ class hLN_Model(object):
 
     #   will need fleshing out/editing according to form of sim_hLN/general Python class for hLN model
     # to define hLN model we just need its structure (Jc) and how the input neurons connect to its subunits
-    def __init__(self, Jc, Wci, Wce, sig_on):
+    def __init__(self, Jc, Wce, Wci, sig_on):
         # Initialize the parameters in some way
         # In practice, these should be initialized to random values (for example, with `tf.random.normal`)
         M = len(Jc)
@@ -86,6 +86,20 @@ def grad(model, inputs, targets):
     return loss_value, grads
 
 
+# define training function
+def train(model, num_epochs, optimizer, inputs, target):
+    """perform gradient descent training on a given hLN model for a specificed number of epochs, while recording
+    loss and accuracy information."""
+    loss_values = []
+    accuracies = []
+    for epoch in tqdm(range(num_epochs)):
+        loss_value, grads = grad(model=model, inputs=inputs, targets=target)
+        accuracy = 100 * (1 - (loss_value/np.var(target)))
+        loss_values.append(loss_value.numpy())
+        accuracies.append(max(accuracy, 0))
+        optimizer.apply_gradients(zip(grads, model.trainable_params))
+
+
 
 # print(tf.autograph.to_code(sim_hLN_tf.python_function))
 
@@ -108,7 +122,7 @@ Jw_sing = np.full([M,1], 1) #coupling weights 1 for all branches intially
 M = len(Jc_sing) #number of subunits
 Wce_sing = [np.arange(0, X_e.shape[0], 1)] #all input excitatory neurons connected to root subunit
 Wwe_sing = [np.ones(X_e.shape[0])] #weighting matrix - all excitatory neurons connected with weight 1
-Wci_sing = [np.arange(N_soma, N_soma + X_i.shape[0] - 1, 1)] #all input inhibitory neurons connected to root subunit
+Wci_sing = [np.arange(X_e.shape[0], X_e.shape[0] + X_i.shape[0] - 1, 1)] #all input inhibitory neurons connected to root subunit
 Wwi_sing = [np.full(X_i.shape[0], -1)] #weighting matrix - all inhibitory neurons connected with weight -1
 Tau_e = [np.full(X_e.shape[0], 1)] #all excitatory time constants 1
 Tau_i = [np.full(X_i.shape[0], 1)] #all inhibitory time constants 1
@@ -175,151 +189,149 @@ params_sing = [v0, Jw_sing, Wwe_sing, Wwi_sing, Tau_e, Tau_i, Th]
 
 ### TRAINING PROCEDURE FOR GENERIC HLN MODEL
 
-# 1. Generate inputs, then generate output signal using some hLN model
-n_timepoints = 100
-start = 24000
-
-X_tot = tf.convert_to_tensor(np.load('real_inputs.npy'), dtype=tf.float32)  # real inputs made earlier
-X_e = X_tot[:629]
-X_i = X_tot[629:]
-
-target = np.load('target.npy')[start:start + n_timepoints]
-target = tf.convert_to_tensor(target, dtype=tf.float32)
-
-# 2. Initialise a linear, single subunit hLN model, and optimise to fit data
-
-
-# initialise model
-hLN_lin = hLN_Model(Jc=Jc_sing, Wci=Wci_sing, Wce=Wce_sing, sig_on=tf.constant([False]))
-
-# train model - should be close to a linear regression problem
-
-# first randomise parameters to be different from those which created the target
-hLN_lin.randomise_parameters()
-
-# then define optimizer - simple gradient descent
-#tensor here for initially slow learning, followed by fast
-learning_rate_lin = 0.01
-optimizer_lin = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=learning_rate_lin)
-
-epochs = range(100)
-loss_values = []
-accuracies = []
-for epoch in tqdm(epochs):
-    if epoch < 10:
-        learning_rate_lin = 0.01
-    elif 10 <= epoch < 100:
-        learning_rate_lin = 0.6
-
-    # logdir = 'log'
-    # writer = tf.summary.create_file_writer(logdir)
-    # tf.summary.trace_on(graph=True, profiler=True)
-    loss_value, grads = grad(model=hLN_lin, inputs=X_tot[:, start:start + n_timepoints], targets=target)
-    # with writer.as_default():
-    #     tf.summary.trace_export(name="test", step=0, profiler_outdir=logdir)
-    accuracy = 100 * (1 - (loss_value/np.var(target)))
-    loss_values.append(loss_value.numpy())
-    accuracies.append(max(accuracy, 0))
-    optimizer_lin = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=learning_rate_lin)
-    optimizer_lin.apply_gradients(zip(grads, hLN_lin.trainable_params))
-
-
-plt.figure(1)
-
-
-plt.subplot(1, 2, 1)
-plt.plot(loss_values)
-plt.title('Loss value')
-plt.xlabel('Epoch number')
-
-plt.subplot(1, 2, 2)
-plt.plot(accuracies)
-plt.title('Prediction accuracy (%)')
-plt.xlabel('Epoch number')
-
-plt.title('Loss and accuracy during linear training')
-plt.tight_layout()
-
-output = hLN_lin(X_tot[:, start:start + n_timepoints])
-
-plt.figure(2)
-plt.plot(target.numpy(), label='Target signal')
-plt.plot(output.numpy(), label='Linear model after training')
-# plt.plot(first_output.numpy(), label='Model before training')
-plt.xlabel('Time (s)')
-# plt.ylabel('Membrane potential (arbitrary units)')
-plt.title('Membrane potential (in arbitrary \n units) over time')
-plt.legend()
-# plt.show()
-
-# 3. Introduce non-linearity by adjusting parameters to approximate linear integration, and optimise further. Accuracy
-#  of linear model should be a lower bound on non-linear model.
-
-# initialise nonlinear model, with sig_on = true
-hLN_nonlin = hLN_Model(Jc=Jc_sing, Wci=Wci_sing, Wce=Wce_sing, sig_on=tf.constant([True]))
-
-# set parameters to those of the linear model
-hLN_nonlin.params, hLN_nonlin.trainable_params = hLN_lin.params, hLN_lin.trainable_params
-
-# now adjust parameters so nonlinear approximates linear
-nSD = 100
-init_nonlin(X=X_tot[:, start:start + n_timepoints], model=hLN_nonlin, nSD=nSD)
-
-output_nonlin = hLN_nonlin(X_tot[:, start:start + n_timepoints])
-
-# plt.figure(3)
+# # 1. Generate inputs, then generate output signal using some hLN model
+# n_timepoints = 100
+# start = 24000
+#
+# X_tot = tf.convert_to_tensor(np.load('real_inputs.npy'), dtype=tf.float32)  # real inputs made earlier
+# X_e = X_tot[:629]
+# X_i = X_tot[629:]
+#
+# target = np.load('target.npy')[start:start + n_timepoints]
+# target = tf.convert_to_tensor(target, dtype=tf.float32)
+#
+# # 2. Initialise a linear, single subunit hLN model, and optimise to fit data
+#
+#
+# # initialise model
+# hLN_lin = hLN_Model(Jc=Jc_sing, Wci=Wci_sing, Wce=Wce_sing, sig_on=tf.constant([False]))
+#
+# # train model - should be close to a linear regression problem
+#
+# # first randomise parameters to be different from those which created the target
+# hLN_lin.randomise_parameters()
+#
+# # then define optimizer - simple gradient descent
+# #tensor here for initially slow learning, followed by fast
+# learning_rate_lin = 0.01
+# optimizer_lin = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=learning_rate_lin)
+#
+# epochs = range(100)
+# loss_values = []
+# accuracies = []
+# for epoch in tqdm(epochs):
+#     if epoch < 10:
+#         learning_rate_lin = 0.01
+#     elif 10 <= epoch < 100:
+#         learning_rate_lin = 0.6
+#
+#     # logdir = 'log'
+#     # writer = tf.summary.create_file_writer(logdir)
+#     # tf.summary.trace_on(graph=True, profiler=True)
+#     loss_value, grads = grad(model=hLN_lin, inputs=X_tot[:, start:start + n_timepoints], targets=target)
+#     # with writer.as_default():
+#     #     tf.summary.trace_export(name="test", step=0, profiler_outdir=logdir)
+#     accuracy = 100 * (1 - (loss_value/np.var(target)))
+#     loss_values.append(loss_value.numpy())
+#     accuracies.append(max(accuracy, 0))
+#     optimizer_lin = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=learning_rate_lin)
+#     optimizer_lin.apply_gradients(zip(grads, hLN_lin.trainable_params))
+#
+#
+# plt.figure(1)
+#
+#
+# plt.subplot(1, 2, 1)
+# plt.plot(loss_values)
+# plt.title('Loss value')
+# plt.xlabel('Epoch number')
+#
+# plt.subplot(1, 2, 2)
+# plt.plot(accuracies)
+# plt.title('Prediction accuracy (%)')
+# plt.xlabel('Epoch number')
+#
+# plt.title('Loss and accuracy during linear training')
+# plt.tight_layout()
+#
+# output = hLN_lin(X_tot[:, start:start + n_timepoints])
+#
+# plt.figure(2)
+# plt.plot(target.numpy(), label='Target signal')
 # plt.plot(output.numpy(), label='Linear model after training')
-# plt.plot(output_nonlin.numpy(), label='Nonlinear model after initialisation')
-# plt.plot(output_nonlin.numpy() - output.numpy(), label='Difference')
+# # plt.plot(first_output.numpy(), label='Model before training')
+# plt.xlabel('Time (s)')
+# # plt.ylabel('Membrane potential (arbitrary units)')
+# plt.title('Membrane potential (in arbitrary \n units) over time')
 # plt.legend()
-# plt.title(f'Effect of adding non-linearity to single subunit model, with nSD={nSD}')
+# # plt.show()
+#
+# # 3. Introduce non-linearity by adjusting parameters to approximate linear integration, and optimise further. Accuracy
+# #  of linear model should be a lower bound on non-linear model.
+#
+# # initialise nonlinear model, with sig_on = true
+# hLN_nonlin = hLN_Model(Jc=Jc_sing, Wci=Wci_sing, Wce=Wce_sing, sig_on=tf.constant([True]))
+#
+# # set parameters to those of the linear model
+# hLN_nonlin.params, hLN_nonlin.trainable_params = hLN_lin.params, hLN_lin.trainable_params
+#
+# # now adjust parameters so nonlinear approximates linear
+# nSD = 100
+# init_nonlin(X=X_tot[:, start:start + n_timepoints], model=hLN_nonlin, nSD=nSD)
+#
+# output_nonlin = hLN_nonlin(X_tot[:, start:start + n_timepoints])
+#
+# # plt.figure(3)
+# # plt.plot(output.numpy(), label='Linear model after training')
+# # plt.plot(output_nonlin.numpy(), label='Nonlinear model after initialisation')
+# # plt.plot(output_nonlin.numpy() - output.numpy(), label='Difference')
+# # plt.legend()
+# # plt.title(f'Effect of adding non-linearity to single subunit model, with nSD={nSD}')
+# # plt.show()
+#
+# # now train new nonlinear model
+# learning_rate_nonlin = 0.01
+# optimizer_nonlin = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=learning_rate_nonlin)
+#
+# epochs = range(500)
+# loss_values = []
+# accuracies = []
+# for epoch in tqdm(epochs):
+#     # logdir = 'log'
+#     # writer = tf.summary.create_file_writer(logdir)
+#     # tf.summary.trace_on(graph=True, profiler=True)
+#     loss_value, grads = grad(model=hLN_nonlin, inputs=X_tot[:, start:start + n_timepoints], targets=target)
+#     # with writer.as_default():
+#     #     tf.summary.trace_export(name="test", step=0, profiler_outdir=logdir)
+#     accuracy = 100 * (1 - (loss_value/np.var(target)))
+#     loss_values.append(loss_value.numpy())
+#     accuracies.append(max(accuracy, 0))
+#     optimizer_nonlin.apply_gradients(zip(grads, hLN_nonlin.trainable_params))
+#
+# output_nonlin2 = hLN_nonlin(X_tot[:, start:start + n_timepoints])
+#
+#
+# plt.figure(4)
+#
+# plt.subplot(1, 2, 1)
+# plt.plot(loss_values)
+# plt.title('Loss value')
+# plt.xlabel('Epoch number')
+#
+# plt.subplot(1, 2, 2)
+# plt.plot(accuracies)
+# plt.title('Prediction accuracy (%)')
+# plt.xlabel('Epoch number')
+#
+# plt.title('Loss and accuracy during nonlinear training')
+# plt.tight_layout()
+#
+# plt.figure(5)
+# plt.plot(output_nonlin2.numpy(), label='Non-linear model after training')
+# plt.plot(target.numpy(), label='Target signal')
+# plt.legend()
+# plt.title(f'Change in nonlinear output signal from training')
 # plt.show()
-
-# now train new nonlinear model
-learning_rate_nonlin = 0.01
-optimizer_nonlin = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=learning_rate_nonlin)
-
-epochs = range(100)
-loss_values = []
-accuracies = []
-for epoch in tqdm(epochs):
-
-    # logdir = 'log'
-    # writer = tf.summary.create_file_writer(logdir)
-    # tf.summary.trace_on(graph=True, profiler=True)
-    loss_value, grads = grad(model=hLN_nonlin, inputs=X_tot[:, start:start + n_timepoints], targets=target)
-    # with writer.as_default():
-    #     tf.summary.trace_export(name="test", step=0, profiler_outdir=logdir)
-    accuracy = 100 * (1 - (loss_value/np.var(target)))
-    loss_values.append(loss_value.numpy())
-    accuracies.append(max(accuracy, 0))
-    optimizer_nonlin.apply_gradients(zip(grads, hLN_nonlin.trainable_params))
-
-output_nonlin2 = hLN_nonlin(X_tot[:, start:start + n_timepoints])
-
-
-plt.figure(4)
-
-plt.subplot(1, 2, 1)
-plt.plot(loss_values)
-plt.title('Loss value')
-plt.xlabel('Epoch number')
-
-plt.subplot(1, 2, 2)
-plt.plot(accuracies)
-plt.title('Prediction accuracy (%)')
-plt.xlabel('Epoch number')
-
-plt.title('Loss and accuracy during nonlinear training')
-plt.tight_layout()
-
-plt.figure(5)
-plt.plot(output_nonlin2.numpy(), label='Non-linear model after training')
-plt.plot(output_nonlin.numpy(), label='Nonlinear model after initialisation')
-plt.plot(target.numpy(), label='Target signal')
-plt.legend()
-plt.title(f'Change in nonlinear output signal from training')
-plt.show()
 
 # 4. Expand to more subunits...
 
