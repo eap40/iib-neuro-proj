@@ -30,7 +30,7 @@ class hLN_Model(object):
         # Initialize the parameters in some way
         # In practice, these should be initialized to random values (for example, with `tf.random.normal`)
         M = len(Jc)
-        self.Jc, self.Wci, self.Wce, self.sig_on = Jc, Wci, Wce, sig_on
+        self.Jc, self.Wce, self.Wci, self.sig_on = Jc, Wce, Wci, sig_on
         self.log_Jw = tf.Variable(np.full(M, 0), dtype=tf.float32) #coupling weights 1 for all branches intially
         self.Wwe = tf.Variable([np.full(X_e.shape[0], 1.0)], dtype=tf.float32)
         self.Wwi = tf.Variable([np.full(X_i.shape[0], -1.0)], dtype=tf.float32)
@@ -88,7 +88,7 @@ def grad(model, inputs, targets):
 
 # define training function
 def train(model, num_epochs, optimizer, inputs, target):
-    """perform gradient descent training on a given hLN model for a specificed number of epochs, while recording
+    """perform gradient descent training on a given hLN model for a specified number of epochs, while recording
     loss and accuracy information."""
     loss_values = []
     accuracies = []
@@ -96,8 +96,30 @@ def train(model, num_epochs, optimizer, inputs, target):
         loss_value, grads = grad(model=model, inputs=inputs, targets=target)
         accuracy = 100 * (1 - (loss_value/np.var(target)))
         loss_values.append(loss_value.numpy())
-        accuracies.append(max(accuracy, 0))
-        optimizer.apply_gradients(zip(grads, model.trainable_params))
+        accuracies.append(max(accuracy.numpy(), 0))
+        optimizer.apply_gradients(zip(grads, model.params))
+
+    return loss_values, accuracies
+
+
+
+def train_sgd(model, num_epochs, optimizer, inputs, target):
+    """perform gradient descent training on a given hLN model for a specified number of epochs, while recording
+    loss and accuracy information. Adjusted to perform SGD to prevent overfitting."""
+    loss_values = []
+    accuracies = []
+    n_points = 1000
+    n_train = int(len(target.numpy()))
+    for epoch in tqdm(range(num_epochs)):
+        t_start = int(np.random.uniform(0, n_train - n_points))
+        loss_value, grads = grad(model=model, inputs=inputs[:, t_start: t_start + n_points],
+                                 targets=target[t_start:t_start + n_points])
+        accuracy = 100 * (1 - (loss_value/np.var(target[t_start:t_start + n_points])))
+        loss_values.append(loss_value.numpy())
+        accuracies.append(max(accuracy.numpy(), 0))
+        optimizer.apply_gradients(zip(grads, model.params))
+
+    return loss_values, accuracies
 
 
 
@@ -130,6 +152,7 @@ Th = [1] #no offset in all sigmoids
 v0 = 0 #no offset in membrane potential
 
 params_sing = [v0, Jw_sing, Wwe_sing, Wwi_sing, Tau_e, Tau_i, Th]
+
 
 # target = sim_hLN_tf(X=X_tot, dt=1, Jc=Jc_sing, Wce=Wce_sing, Wci=Wci_sing, params=hLN_model.params)
 
@@ -199,6 +222,7 @@ params_sing = [v0, Jw_sing, Wwe_sing, Wwi_sing, Tau_e, Tau_i, Th]
 #
 # target = np.load('target.npy')[start:start + n_timepoints]
 # target = tf.convert_to_tensor(target, dtype=tf.float32)
+# print(target)
 #
 # # 2. Initialise a linear, single subunit hLN model, and optimise to fit data
 #
@@ -216,7 +240,7 @@ params_sing = [v0, Jw_sing, Wwe_sing, Wwi_sing, Tau_e, Tau_i, Th]
 # learning_rate_lin = 0.01
 # optimizer_lin = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=learning_rate_lin)
 #
-# epochs = range(100)
+# epochs = range(10)
 # loss_values = []
 # accuracies = []
 # for epoch in tqdm(epochs):
@@ -264,7 +288,7 @@ params_sing = [v0, Jw_sing, Wwe_sing, Wwi_sing, Tau_e, Tau_i, Th]
 # # plt.ylabel('Membrane potential (arbitrary units)')
 # plt.title('Membrane potential (in arbitrary \n units) over time')
 # plt.legend()
-# # plt.show()
+# plt.show()
 #
 # # 3. Introduce non-linearity by adjusting parameters to approximate linear integration, and optimise further. Accuracy
 # #  of linear model should be a lower bound on non-linear model.
