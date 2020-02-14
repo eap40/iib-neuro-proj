@@ -180,3 +180,64 @@ def int_spikes(X, dt, Wc, Ww, Tau, delay):
     return tf.reshape(out, [-1])
 
 
+def remove_nestings(l, output):
+    """function for flattening lists used to define hierarchical clustering of neurons"""
+    for i in l:
+        if type(i) == list:
+            remove_nestings(i, output)
+        else:
+            output.append(i)
+
+    return output
+
+
+def create_weights(Jc, n_levels, clusts):
+    """Function here to create the Wci and Wce list for different hLN architectures. For now put neuron ensembles
+    onto the same leaves, with the mapping determined by the clusts list. Remember the first inhibitory input
+    is somatic and should go to the root subunit"""
+
+
+    # define the number of neurons in each ensemble
+    esyn = [48, 58, 52, 34, 45, 39, 44, 68, 50, 62, 30, 60, 39]
+    isyn = [11, 11, 9, 6, 8, 5, 8, 12, 11, 13, 6, 11, 8]
+    esyn_cum = np.cumsum(esyn)
+    isyn_cum = np.cumsum(isyn)
+    n_e = np.sum(esyn)
+    n_i = np.sum(isyn)
+
+    M = len(Jc)  # number of subunits
+    # create empty lists to store weights in
+    Wce = [[] for i in range(M)]
+    Wci = [[] for i in range(M)]
+
+    # find leaves - subunits that don't take inputs from other subunits
+    leaves = np.setdiff1d(np.arange(1, M + 1, 1), Jc)
+    n_leaves = len(leaves)  # number of leaves determines how we will split the inputs
+
+    # unlist clusts to appropriate degree depending on number of levels in architecture
+    for level in range(n_levels - 1):
+        clusts = list(itertools.chain.from_iterable(clusts))
+
+    # find neurons connected to each leaf
+    for index, leaf in list(enumerate(leaves)):
+        # find ensemble numbers connected to each leaf
+        output = []
+        ens = remove_nestings(clusts[index], output)
+        if min(ens) == 0:
+            e_start = 0
+            i_start = n_e
+        else:
+            e_start = esyn_cum[min(ens) - 1]
+            i_start = n_e + isyn_cum[min(ens) - 1]
+
+        e_finish = esyn_cum[max(ens)]
+        i_finish = n_e + isyn_cum[max(ens)]
+        Wce[leaf - 1] = np.arange(e_start, e_finish, 1)
+        Wci[leaf - 1] = np.arange(i_start, i_finish,
+                                  1) + 1  # add one as first inhibitory neuron is always connected to soma
+
+    Wci[0] = np.insert(Wci[0], 0, n_e)  # attach first inhibitory neuron to soma
+
+    return Wce, Wci
+
+
