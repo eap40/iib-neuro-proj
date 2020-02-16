@@ -11,16 +11,6 @@ from tqdm import tqdm
 
 matplotlib.rcParams["legend.frameon"] = False
 
-# SMALL_SIZE, MEDIUM_SIZE, BIG_SIZE = 24, 24, 24
-#
-# plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
-# plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
-# plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
-# plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-# plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-# plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
-# plt.rc('figure', titlesize=BIG_SIZE)  # fontsize of the figure title
-
 
 class hLN_Model(object):
 
@@ -30,15 +20,19 @@ class hLN_Model(object):
         # Initialize the parameters in some way
         # In practice, these should be initialized to random values (for example, with `tf.random.normal`)
         M = len(Jc)
+        e_shape = np.array(Wce).shape
+        i_shape = np.array(Wci).shape
         self.Jc, self.Wce, self.Wci, self.sig_on = Jc, Wce, Wci, sig_on
-        self.log_Jw = tf.Variable(np.full(M, 0), dtype=tf.float32) #coupling weights 1 for all branches intially
-        self.Wwe = tf.Variable([np.full(X_e.shape[0], 1.0)], dtype=tf.float32)
-        self.Wwi = tf.Variable([np.full(X_i.shape[0], -1.0)], dtype=tf.float32)
-        self.log_Tau_e = tf.Variable([np.full(X_e.shape[0], 0)], dtype=tf.float32)
-        self.log_Tau_i = tf.Variable([np.full(X_i.shape[0], 0)], dtype=tf.float32)
-        self.Th = tf.Variable([1.0], dtype=tf.float32)
-        self.log_Delay = tf.Variable(np.zeros([M, 1]), dtype=tf.float32)
-        self.v0 = tf.Variable(0, dtype=tf.float32)
+        self.log_Jw = tf.Variable(tf.random.uniform(shape=[M], minval=0, maxval=0, dtype=tf.float32))
+        self.Wwe = tf.Variable(tf.random.uniform(shape=e_shape, minval=0, maxval=5, dtype=tf.float32))
+        self.Wwi = tf.Variable(tf.random.uniform(shape=i_shape, minval=-5, maxval=0, dtype=tf.float32))
+        self.log_Tau_e = tf.Variable(tf.random.uniform(shape=e_shape, minval=-7, maxval=2, dtype=tf.float32))
+        self.log_Tau_i = tf.Variable(tf.random.uniform(shape=i_shape, minval=-7, maxval=2, dtype=tf.float32))
+        # can initialise Th to anything as model is initially linear, and then Th will be initialised by another
+        # routine when it becomes nonlinear
+        self.Th = tf.Variable(tf.random.uniform(shape=[M], minval=-3, maxval=3, dtype=tf.float32))
+        self.log_Delay = tf.Variable(tf.random.uniform(shape=[M], minval=-7, maxval=2, dtype=tf.float32))
+        self.v0 = tf.Variable(tf.random.uniform(shape=(), minval=-5, maxval=5, dtype=tf.float32))
         self.params = (self.v0, self.log_Jw, self.Wwe, self.Wwi, self.log_Tau_e, self.log_Tau_i,
                        self.Th, self.log_Delay)
         self.trainable_params = (self.v0, self.log_Jw, self.Wwe, self.Wwi, self.log_Tau_e, self.log_Tau_i,
@@ -49,22 +43,24 @@ class hLN_Model(object):
         return sim_hLN_tf(X=x, dt=1, Jc=self.Jc, Wce=self.Wce, Wci=self.Wci, params=self.params, sig_on=self.sig_on)
 
     def randomise_parameters(self):
-        # self.Wwe = tf.Variable([np.random.uniform(0, 2, X_e.shape[0])], dtype=tf.float32)
-        # self.Wwi = tf.Variable([np.random.uniform(-2, 0, X_i.shape[0])], dtype=tf.float32)
-        # self.Tau_e = tf.Variable([np.random.uniform(0, 2, X_e.shape[0])], dtype=tf.float32)
-        # self.Tau_i = tf.Variable([np.random.uniform(0, 2, X_i.shape[0])], dtype=tf.float32)
-        # self.v0 = tf.Variable(np.mean(target), dtype=tf.float32)
-        self.log_Jw.assign(np.random.uniform(0, 1, M))
-        self.Wwe.assign([np.random.uniform(0, 2, X_e.shape[0])])
-        self.Wwi.assign([np.random.uniform(-2, 0, X_i.shape[0])])
-        self.log_Tau_e.assign([np.random.uniform(0, 1, X_e.shape[0])])
-        self.log_Tau_i.assign([np.random.uniform(0, 1, X_i.shape[0])])
-        self.Th.assign([np.random.uniform(-0.5, 0.5)])
-        self.v0.assign(np.random.uniform(0, 0.2))
+        M = len(self.Jc)
+        e_shape = np.array(self.Wce).shape
+        i_shape = np.array(self.Wci).shape
+        self.log_Jw.assign(tf.random.uniform(shape=[M], minval=0, maxval=0, dtype=tf.float32))
+        self.Wwe.assign(tf.random.uniform(shape=e_shape, minval=0, maxval=5, dtype=tf.float32))
+        self.Wwi.assign(tf.random.uniform(shape=i_shape, minval=-5, maxval=0, dtype=tf.float32))
+        self.log_Tau_e.assign(tf.random.uniform(shape=e_shape, minval=-7, maxval=2, dtype=tf.float32))
+        self.log_Tau_i.assign(tf.random.uniform(shape=i_shape, minval=-7, maxval=2, dtype=tf.float32))
+        # can initialise Th to anything as model is initially linear, and then Th will be initialised by another
+        # routine when it becomes nonlinear
+        self.Th.assign(tf.random.uniform(shape=[M], minval=-3, maxval=3, dtype=tf.float32))
+        self.log_Delay.assign(tf.random.uniform(shape=[M], minval=-7, maxval=2, dtype=tf.float32))
+        self.v0.assign(tf.random.uniform(shape=(), minval=-5, maxval=5, dtype=tf.float32))
         self.params = (self.v0, self.log_Jw, self.Wwe, self.Wwi, self.log_Tau_e, self.log_Tau_i,
                        self.Th, self.log_Delay)
         self.trainable_params = (self.v0, self.log_Jw, self.Wwe, self.Wwi, self.log_Tau_e, self.log_Tau_i,
                                  self.Th, self.log_Delay)
+
         return
 
 
@@ -132,26 +128,26 @@ def train_sgd(model, num_epochs, optimizer, inputs, target):
 # X_e = spikes_to_input(E_spikes, Tmax=48000)
 # X_i = spikes_to_input(I_spikes, Tmax=48000)
 # X_tot = np.vstack((X_e, X_i)) #this is our final input
-X_tot = tf.convert_to_tensor(np.load('real_inputs.npy'), dtype=tf.float32)  # real inputs made earlier
-X_e = X_tot[:629]
-X_i = X_tot[629:]
-
-# true parameters to produce output:
-N_soma = 420
-Jc_sing = np.array([0])
-M = len(Jc_sing)
-Jw_sing = np.full([M,1], 1) #coupling weights 1 for all branches intially
-M = len(Jc_sing) #number of subunits
-Wce_sing = [np.arange(0, X_e.shape[0], 1)] #all input excitatory neurons connected to root subunit
-Wwe_sing = [np.ones(X_e.shape[0])] #weighting matrix - all excitatory neurons connected with weight 1
-Wci_sing = [np.arange(X_e.shape[0], X_e.shape[0] + X_i.shape[0] - 1, 1)] #all input inhibitory neurons connected to root subunit
-Wwi_sing = [np.full(X_i.shape[0], -1)] #weighting matrix - all inhibitory neurons connected with weight -1
-Tau_e = [np.full(X_e.shape[0], 1)] #all excitatory time constants 1
-Tau_i = [np.full(X_i.shape[0], 1)] #all inhibitory time constants 1
-Th = [1] #no offset in all sigmoids
-v0 = 0 #no offset in membrane potential
-
-params_sing = [v0, Jw_sing, Wwe_sing, Wwi_sing, Tau_e, Tau_i, Th]
+# X_tot = tf.convert_to_tensor(np.load('Data/real_inputs.npy'), dtype=tf.float32)  # real inputs made earlier
+# X_e = X_tot[:629]
+# X_i = X_tot[629:]
+#
+# # true parameters to produce output:
+# N_soma = 420
+# Jc_sing = np.array([0])
+# M = len(Jc_sing)
+# Jw_sing = np.full([M,1], 1) #coupling weights 1 for all branches intially
+# M = len(Jc_sing) #number of subunits
+# Wce_sing = [np.arange(0, X_e.shape[0], 1)] #all input excitatory neurons connected to root subunit
+# Wwe_sing = [np.ones(X_e.shape[0])] #weighting matrix - all excitatory neurons connected with weight 1
+# Wci_sing = [np.arange(X_e.shape[0], X_e.shape[0] + X_i.shape[0] - 1, 1)] #all input inhibitory neurons connected to root subunit
+# Wwi_sing = [np.full(X_i.shape[0], -1)] #weighting matrix - all inhibitory neurons connected with weight -1
+# Tau_e = [np.full(X_e.shape[0], 1)] #all excitatory time constants 1
+# Tau_i = [np.full(X_i.shape[0], 1)] #all inhibitory time constants 1
+# Th = [1] #no offset in all sigmoids
+# v0 = 0 #no offset in membrane potential
+#
+# params_sing = [v0, Jw_sing, Wwe_sing, Wwi_sing, Tau_e, Tau_i, Th]
 
 
 # target = sim_hLN_tf(X=X_tot, dt=1, Jc=Jc_sing, Wce=Wce_sing, Wci=Wci_sing, params=hLN_model.params)
