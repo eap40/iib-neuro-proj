@@ -1,9 +1,7 @@
 #############################################
-# A function to randomlly intialise the parameters Ww.e, Jw and/or Th to generate data or to initialise learning
-# We initialise these parameters randomly, though we try to be close to linear in general
-# The output is standardised - its mean is 0 and its variance is 1
-# initialization for the parameters (including W.ahp) is formally correct, but this does not mean that it is biologically meaningful
-
+# File containing functions for initialising hLN models. init_nonlin initialises nonlinearities for architectures
+# previously containing linear subunits. <update_architecture> will add new linear subunits to an existing
+# architecture, which should essentially involve just redistributing inputs.
 
 import tensorflow as tf
 import numpy as np
@@ -11,25 +9,51 @@ import matplotlib
 import matplotlib.pyplot as plt
 from sim_hLN import *
 from utils import *
+import copy
 
 # @tf.function
-def init_nonlin(X, model, nSD, dt=1):
-    """function to initialise the nonlinearity of a single-subunit hLN model. The parameters of the linear model
-    should already have been optimised, and as such its accuracy should be a lower bound on the accuracy of
-    the new non-linear ,model"""
+def init_nonlin(X, model, lin_model, nSD, dt=1):
+    """function to initialise the nonlinearities in subunits which were previously nonlinear. The parameters
+     of the linear model should already have been optimised, and as such its accuracy should be a lower bound on the
+    accuracy of the new non-linear model
+    X: binary matrix of inputs
+    model: nonlinear model to set parameters for
+    lin_model: linear model with same architecture, parameters of which have been optimised
+    """
+
+    # first set parameters of new nonlinear model to those of optimised linear model
+    model.log_Jw.assign(lin_model.logJw)
+    model.Wwe.assign(lin_model.Wwe)
+    model.Wwi.assign(lin_model.Wwi)
+    model.log_Tau_e.assign(lin_model.logTaue)
+    model.log_Tau_i.assign(lin_model.logTaui)
+    model.Th.assign(lin_model.Th)
+    model.log_Delay.assign(lin_model.logDelay)
+    model.v0.assign(lin_model.v0)
+    # model.params = (model.v0, model.log_Jw, model.Wwe, model.Wwi, model.log_Tau_e, model.log_Tau_i,
+    #                model.Th, model.log_Delay)
+    # model.trainable_params = (model.v0, model.log_Jw, model.Wwe, model.Wwi, model.log_Tau_e, model.log_Tau_i,
+    #                          model.Th, model.log_Delay)
 
 
+
+    # to extend to more subunits, make everything numpy so we can assign it. Then convert back to tensors at the end
     Jc, Wce, Wci = model.Jc, model.Wce, model.Wci
-    # params should be parameters of a previously created hLN model
-    v0, log_Jw, Wwe, Wwi, log_Tau_e, log_Tau_i, Th, log_Delay = model.params
+    # params should be parameters of a previously created hLN model - convert to numpy so we can assign
+    v0, log_Jw, Wwe, Wwi, log_Tau_e, log_Tau_i, Th, log_Delay = [param.numpy() for param in model.params]
+
+
 
     # these parameters defined by their logs to ensure positivity - convert here
-    Jw, Tau_e, Tau_i, Delay = tf.exp(log_Jw), tf.exp(log_Tau_e), tf.exp(log_Tau_i), tf.exp(log_Delay)
+    Jw, Tau_e, Tau_i, Delay = np.exp(log_Jw), np.exp(log_Tau_e), np.exp(log_Tau_i), np.exp(log_Delay)
 
     N = X.shape[0]
     L = X.shape[1]
     Tmax = L / dt
     M = len(Jc)
+
+    # first find which subunits we want to initialise nonlinearities for - should just be the leaves:
+    leaves = np.setdiff1d(np.arange(1, M + 1, 1), Jc)
 
     # # set Jw of linear subunit to 1 and adjust synaptic weights accordingly to compensate
     Wwe.assign(Wwe * Jw[0])
@@ -59,7 +83,7 @@ def init_nonlin(X, model, nSD, dt=1):
             synapse = 0
             for neuron in Wce[m]:
                 # add convolved input to Y matrix if alpha set true
-                increment = int_spikes(X=X, dt=dt, Wc=Wce[m][synapse], Ww=Wwe[m][synapse], Tau=Tau_e[m][synapse],
+                increment = int_spikes(X=X, dt=dt, Wc=Wce[m][synapse], Ww=Wwe[neuron], Tau=Tau_e[neuron],
                                        delay=Delay[m])
                 Y_m += increment
 
@@ -71,8 +95,8 @@ def init_nonlin(X, model, nSD, dt=1):
             # if inhibitory input exists for subunit, calculate response
             synapse = 0
             for neuron in Wci[m]:
-                Y_m += int_spikes(X=X, dt=dt, Wc=Wci[m][synapse], Ww=Wwi[m][synapse], Tau=Tau_i[m][synapse],
-                                  delay=Delay[m])
+                Y_m += int_spikes(X=X, dt=dt, Wc=Wci[m][synapse], Ww=Wwi[neuron - model.n_e],
+                                  Tau=Tau_i[neuron - model.n_e], delay=Delay[m])
                 synapse += 1
 
         # append Y_m to list of Y_ms, then stack them all at the end of the for loop in ms
@@ -111,9 +135,12 @@ def init_nonlin(X, model, nSD, dt=1):
             if leaf != 1: # if not the soma
                 # we want to rescale inputs to linear range first
                 range_Y = tf.math.reduce_std(Y[leaf-1, :])
-                # rescale = 1 / (nSD * range_Y)
-                # Wwe = rescale * Wwe  # need to change this for single subunit case, but will have trouble assigning values in tensor
-                # Wwi = rescale * Wwi
+                alpha = nSD * range_Y
+
+                if len(Wce[m] > 0):  # if leaf has any e neurons connected to it
+                    Wwe[[Wce[m]]] /= alpha
+                if len(Wci[m] > 0):  # if leaf has any i neurons connected to it
+                    Wwi[[Wci[m]]] /= alpha
                 #
                 # # rescale inputs from other subunits similarly
                 # children = np.argwhere(Jc_orig == leaf)
@@ -132,12 +159,14 @@ def init_nonlin(X, model, nSD, dt=1):
                 # children = np.argwhere(Jc_orig == leaf)
                 range_Y = tf.math.reduce_std(Y[leaf - 1, :])
                 alpha = (nSD * range_Y)
-                Wwe.assign(Wwe / alpha)  # need to change this for multiple subunit case, but will have trouble assigning values in tensor
-                Wwi.assign(Wwi / alpha)
+                if len(Wce[m] > 0):  # if leaf has any e neurons connected to it
+                    Wwe[[Wce[m]]] /= alpha
+                if len(Wci[m] > 0):  # if leaf has any i neurons connected to it
+                    Wwi[[Wci[m]]] /= alpha
                 # for root subunit offset, we need the sum of all Y row means excluding the 0th row
                 # means = tf.math.reduce_mean(Y, axis=1)
                 # means[0] = 0  # we don't want to include input to the root subunit in its offset
-                Th[leaf-1].assign(tf.reduce_mean(Y[leaf - 1, :]) / alpha)
+                Th[leaf-1] = (tf.reduce_mean(Y[leaf - 1, :]) / alpha)
                 v0.assign_add(tf.reduce_mean(Y[leaf - 1, :]) - 2 * alpha)
                 Jw = Jw * 4.0 * alpha
 
@@ -173,5 +202,41 @@ def init_nonlin(X, model, nSD, dt=1):
     # log_Tau_e.assign(tf.math.log(Tau_e))
 
     model.params = v0, log_Jw, Wwe, Wwi, log_Tau_e, log_Tau_i, Th, log_Delay
+
+    return
+
+
+def update_arch(prev_model, next_model):
+    """Function to assign the correct parameters to a new architecture which has added new linear leaf subunits
+    from the previous architecture. The Jc, Wce and Wci of the new architecture are known, so the synaptic
+    parameters just need to be redistributed accordingly"""
+
+    # first change hLN attributes into numpy - allows assignment and should be easier to manipulate
+    Wwe_old, Wwi_old = prev_model.Wwe.numpy(), prev_model.Wwi.numpy()
+    logTaue_old, logTaui_old = prev_model.logTaue.numpy(), prev_model.logTaui.numpy()
+    Wce_old, Wci_old = np.array(prev_model.Wce), np.array(prev_model.Wci)
+    Wce_new, Wci_new = np.array(next_model.Wce), np.array(next_model.Wci)
+    logJw = next_model.logJw.numpy()
+    logDelay = next_model.logDelay.numpy()
+
+
+    # work out which subunits we have just added - for these cases should just be the leaves
+    M = len(next_model.Jc)
+    leaves = np.setdiff1d(np.arange(1, M+1, 1), next_model.Jc)
+    for leaf in leaves:
+        logJw[leaf-1] = 0  # set subunit gain to 1 for all new leaves
+        # then set delay to the delay of the subunit parent from the previous model
+        parent = next_model.Jc[leaf-1]
+        logDelay[leaf-1] = prev_model.logDelay.numpy()[parent-1]
+
+
+
+    # assign the newly calculated parameters to the new model
+    next_model.Wwe.assign(prev_model.Wwe)
+    next_model.Wwi.assign(prev_model.Wwi)
+    next_model.logTaue.assign(prev_model.logTaue)
+    next_model.logTaui.assign(prev_model.logTaui)
+    next_model.logJw.assign(logJw)
+    next_model.logDelay.assign(logDelay)
 
     return
