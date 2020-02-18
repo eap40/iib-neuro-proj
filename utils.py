@@ -1,9 +1,9 @@
 import numpy as np
 from scipy import sparse as sps
-import matplotlib.pyplot as plt
 import seaborn as sns
 import tensorflow as tf
-
+import itertools
+import copy
 
 
 sns.set()
@@ -202,13 +202,13 @@ def create_weights(Jc, n_levels, clusts):
     isyn = [11, 11, 9, 6, 8, 5, 8, 12, 11, 13, 6, 11, 8]
     esyn_cum = np.cumsum(esyn)
     isyn_cum = np.cumsum(isyn)
-    n_e = np.sum(esyn)
+    n_e = int(np.sum(esyn))
     n_i = np.sum(isyn)
 
     M = len(Jc)  # number of subunits
     # create empty lists to store weights in
-    Wce = [[] for i in range(M)]
-    Wci = [[] for i in range(M)]
+    Wce = [np.array([], dtype=int) for i in range(M)]
+    Wci = [np.array([], dtype=int) for i in range(M)]
 
     # find leaves - subunits that don't take inputs from other subunits
     leaves = np.setdiff1d(np.arange(1, M + 1, 1), Jc)
@@ -238,6 +238,6 @@ def create_weights(Jc, n_levels, clusts):
 
     Wci[0] = np.insert(Wci[0], 0, n_e)  # attach first inhibitory neuron to soma
 
-    return Wce, Wci
+    return np.array(Wce), np.array(Wci)
 
 
