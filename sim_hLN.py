@@ -21,8 +21,6 @@ sns.set()
 Jc_sing = np.array([0])
 Jc_five = np.array([0, 1, 1, 1, 1])
 
-
-
 @tf.function
 def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, sig_on, alpha=True, double=False, mult_inputs=False):
     """
@@ -72,8 +70,11 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, sig_on, alpha=True, double=False, mu
     Jw, Tau_e, Tau_i, Delay = tf.exp(log_Jw), tf.exp(log_Tau_e), tf.exp(log_Tau_i), tf.exp(log_Delay)
 
     N = X.shape[0]  # number of input neurons
-    Ne = len(Wce)  # number of excitatory neurons
-    Ni = len(Wci)  # number of inhibitory neurons
+    n_e = tf.constant(629, dtype=tf.int32)
+    # tf.print(tf.concat(Wce, axis=0).shape)
+    # tf.print(n_e)
+    # n_e = np.concatenate(Wce).ravel().shape[0]  # number of excitatory neurons
+    # n_i = np.concatenate(Wci).ravel().shape[0]  # number of inhibitory neurons
     L = X.shape[1]  # number of timesteps
 
     M = len(Jc)  # number of subunits
@@ -112,7 +113,7 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, sig_on, alpha=True, double=False, mu
             for neuron in Wce[m]:
                 if alpha:
                     # add convolved input to Y matrix if alpha set true
-                    increment = int_spikes(X=X, dt=dt, Wc=Wce[m][synapse], Ww=Wwe[m][synapse], Tau=Tau_e[m][synapse],
+                    increment = int_spikes(X=X, dt=dt, Wc=Wce[m][synapse], Ww=Wwe[neuron], Tau=Tau_e[neuron],
                                            delay=Delay[m])
                     Y_m += increment
 
@@ -128,7 +129,7 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, sig_on, alpha=True, double=False, mu
             # if inhibitory input exists for subunit, calculate response
             synapse = 0
             for neuron in Wci[m]:
-                Y_m += int_spikes(X=X, dt=dt, Wc=Wci[m][synapse], Ww=Wwi[m][synapse], Tau=Tau_i[m][synapse],
+                Y_m += int_spikes(X=X, dt=dt, Wc=Wci[m][synapse], Ww=Wwi[neuron - n_e], Tau=Tau_i[neuron - n_e],
                                   delay=Delay[m])
                 synapse += 1
 
