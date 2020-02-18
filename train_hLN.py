@@ -20,23 +20,24 @@ class hLN_Model(object):
         # Initialize the parameters in some way
         # In practice, these should be initialized to random values (for example, with `tf.random.normal`)
         M = len(Jc)
-        e_shape = np.array(Wce).shape
-        i_shape = np.array(Wci).shape
-        self.Jc, self.Wce, self.Wci, self.sig_on = Jc, Wce, Wci, sig_on
-        self.log_Jw = tf.Variable(tf.random.uniform(shape=[M], minval=0, maxval=0, dtype=tf.float32))
-        self.Wwe = tf.Variable(tf.random.uniform(shape=e_shape, minval=0, maxval=5, dtype=tf.float32))
-        self.Wwi = tf.Variable(tf.random.uniform(shape=i_shape, minval=-5, maxval=0, dtype=tf.float32))
-        self.log_Tau_e = tf.Variable(tf.random.uniform(shape=e_shape, minval=-7, maxval=2, dtype=tf.float32))
-        self.log_Tau_i = tf.Variable(tf.random.uniform(shape=i_shape, minval=-7, maxval=2, dtype=tf.float32))
+        self.n_e = np.concatenate(Wce).ravel().shape[0]
+        self.n_i = np.concatenate(Wci).ravel().shape[0]
+        self.Jc, self.Wce, self.Wci, self.sig_on = Jc, tf.ragged.constant(Wce, dtype=tf.int32), \
+                                                   tf.ragged.constant(Wci, dtype=tf.int32), sig_on
+        self.logJw = tf.Variable(tf.random.uniform(shape=[M], minval=0, maxval=0, dtype=tf.float32))
+        self.Wwe = tf.Variable(tf.random.uniform(shape=[self.n_e], minval=0, maxval=5, dtype=tf.float32))
+        self.Wwi = tf.Variable(tf.random.uniform(shape=[self.n_i], minval=-5, maxval=0, dtype=tf.float32))
+        self.logTaue = tf.Variable(tf.random.uniform(shape=[self.n_e], minval=-7, maxval=2, dtype=tf.float32))
+        self.logTaui = tf.Variable(tf.random.uniform(shape=[self.n_i], minval=-7, maxval=2, dtype=tf.float32))
         # can initialise Th to anything as model is initially linear, and then Th will be initialised by another
         # routine when it becomes nonlinear
         self.Th = tf.Variable(tf.random.uniform(shape=[M], minval=-3, maxval=3, dtype=tf.float32))
-        self.log_Delay = tf.Variable(tf.random.uniform(shape=[M], minval=-7, maxval=2, dtype=tf.float32))
+        self.logDelay = tf.Variable(tf.random.uniform(shape=[M], minval=-7, maxval=2, dtype=tf.float32))
         self.v0 = tf.Variable(tf.random.uniform(shape=(), minval=-5, maxval=5, dtype=tf.float32))
-        self.params = (self.v0, self.log_Jw, self.Wwe, self.Wwi, self.log_Tau_e, self.log_Tau_i,
-                       self.Th, self.log_Delay)
-        self.trainable_params = (self.v0, self.log_Jw, self.Wwe, self.Wwi, self.log_Tau_e, self.log_Tau_i,
-                                 self.Th, self.log_Delay)
+        self.params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
+                       self.Th, self.logDelay)
+        self.trainable_params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
+                                 self.Th, self.logDelay)
 
 
     def __call__(self, x):
@@ -44,22 +45,20 @@ class hLN_Model(object):
 
     def randomise_parameters(self):
         M = len(self.Jc)
-        e_shape = np.array(self.Wce).shape
-        i_shape = np.array(self.Wci).shape
-        self.log_Jw.assign(tf.random.uniform(shape=[M], minval=0, maxval=0, dtype=tf.float32))
-        self.Wwe.assign(tf.random.uniform(shape=e_shape, minval=0, maxval=5, dtype=tf.float32))
-        self.Wwi.assign(tf.random.uniform(shape=i_shape, minval=-5, maxval=0, dtype=tf.float32))
-        self.log_Tau_e.assign(tf.random.uniform(shape=e_shape, minval=-7, maxval=2, dtype=tf.float32))
-        self.log_Tau_i.assign(tf.random.uniform(shape=i_shape, minval=-7, maxval=2, dtype=tf.float32))
+        self.logJw.assign(tf.random.uniform(shape=[M], minval=0, maxval=0, dtype=tf.float32))
+        self.Wwe.assign(tf.random.uniform(shape=[self.n_e], minval=0, maxval=5, dtype=tf.float32))
+        self.Wwi.assign(tf.random.uniform(shape=[self.n_i], minval=-5, maxval=0, dtype=tf.float32))
+        self.logTaue.assign(tf.random.uniform(shape=[self.n_e], minval=-7, maxval=2, dtype=tf.float32))
+        self.logTaui.assign(tf.random.uniform(shape=[self.n_i], minval=-7, maxval=2, dtype=tf.float32))
         # can initialise Th to anything as model is initially linear, and then Th will be initialised by another
         # routine when it becomes nonlinear
         self.Th.assign(tf.random.uniform(shape=[M], minval=-3, maxval=3, dtype=tf.float32))
-        self.log_Delay.assign(tf.random.uniform(shape=[M], minval=-7, maxval=2, dtype=tf.float32))
+        self.logDelay.assign(tf.random.uniform(shape=[M], minval=-7, maxval=2, dtype=tf.float32))
         self.v0.assign(tf.random.uniform(shape=(), minval=-5, maxval=5, dtype=tf.float32))
-        self.params = (self.v0, self.log_Jw, self.Wwe, self.Wwi, self.log_Tau_e, self.log_Tau_i,
-                       self.Th, self.log_Delay)
-        self.trainable_params = (self.v0, self.log_Jw, self.Wwe, self.Wwi, self.log_Tau_e, self.log_Tau_i,
-                                 self.Th, self.log_Delay)
+        self.params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
+                       self.Th, self.logDelay)
+        self.trainable_params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
+                                 self.Th, self.logDelay)
 
         return
 
@@ -116,7 +115,6 @@ def train_sgd(model, num_epochs, optimizer, inputs, target):
         optimizer.apply_gradients(zip(grads, model.params))
 
     return loss_values, accuracies
-
 
 
 # print(tf.autograph.to_code(sim_hLN_tf.python_function))
