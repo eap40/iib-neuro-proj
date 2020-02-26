@@ -1,13 +1,12 @@
 import tensorflow as tf
 import numpy as np
 import matplotlib
-import matplotlib.pyplot as plt
-from tensorflow import keras
 import urllib
 from sim_hLN import *
 from init_hLN import *
 from utils import *
 from tqdm import tqdm
+# from plot import *
 
 matplotlib.rcParams["legend.frameon"] = False
 
@@ -24,20 +23,31 @@ class hLN_Model(object):
         self.n_i = np.concatenate(Wci).ravel().shape[0]
         self.Jc, self.Wce, self.Wci, self.sig_on = Jc, tf.ragged.constant(Wce, dtype=tf.int32), \
                                                    tf.ragged.constant(Wci, dtype=tf.int32), sig_on
-        self.logJw = tf.Variable(tf.random.uniform(shape=[M], minval=0, maxval=0, dtype=tf.float32))
-        self.Wwe = tf.Variable(tf.random.uniform(shape=[self.n_e], minval=0, maxval=5, dtype=tf.float32))
-        self.Wwi = tf.Variable(tf.random.uniform(shape=[self.n_i], minval=-5, maxval=0, dtype=tf.float32))
-        self.logTaue = tf.Variable(tf.random.uniform(shape=[self.n_e], minval=-7, maxval=2, dtype=tf.float32))
-        self.logTaui = tf.Variable(tf.random.uniform(shape=[self.n_i], minval=-7, maxval=2, dtype=tf.float32))
+        self.Jw = tf.random.uniform(shape=[M], minval=1, maxval=1, dtype=tf.float32)
+        self.logJw = tf.Variable(tf.math.log(self.Jw))
+        self.Wwe = tf.Variable(tf.random.uniform(shape=[self.n_e], minval=0.05, maxval=0.15, dtype=tf.float32))
+        self.Wwi = tf.Variable(tf.random.uniform(shape=[self.n_i], minval=-0.15, maxval=-0.05, dtype=tf.float32))
+        self.Taue = tf.random.uniform(shape=[self.n_e], minval=10, maxval=20, dtype=tf.float32)
+        self.logTaue = tf.Variable(tf.math.log(self.Taue))
+        self.Taui = tf.random.uniform(shape=[self.n_i], minval=5, maxval=10, dtype=tf.float32)
+        self.logTaui = tf.Variable(tf.math.log(self.Taui))
         # can initialise Th to anything as model is initially linear, and then Th will be initialised by another
         # routine when it becomes nonlinear
         self.Th = tf.Variable(tf.random.uniform(shape=[M], minval=-3, maxval=3, dtype=tf.float32))
-        self.logDelay = tf.Variable(tf.random.uniform(shape=[M], minval=-7, maxval=2, dtype=tf.float32))
-        self.v0 = tf.Variable(tf.random.uniform(shape=(), minval=-5, maxval=5, dtype=tf.float32))
+        self.Delay = tf.random.uniform(shape=[M], minval=0.1, maxval=5, dtype=tf.float32)
+        self.logDelay = tf.Variable(tf.math.log(self.Delay))
+        self.v0 = tf.Variable(tf.random.uniform(shape=(), minval=-0.1, maxval=0.1, dtype=tf.float32))
         self.params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
                        self.Th, self.logDelay)
         self.trainable_params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
                                  self.Th, self.logDelay)
+
+
+        if M == 1 and not sig_on[0]:
+            # if single subunit linear model, take out parameters from trainable_params list
+            self.logJw.assign([0])
+            self.trainable_params = (self.v0, self.Wwe, self.Wwi, self.logTaue, self.logTaui, self.logDelay)
+
 
 
     def __call__(self, x):
@@ -45,20 +55,29 @@ class hLN_Model(object):
 
     def randomise_parameters(self):
         M = len(self.Jc)
-        self.logJw.assign(tf.random.uniform(shape=[M], minval=0, maxval=0, dtype=tf.float32))
-        self.Wwe.assign(tf.random.uniform(shape=[self.n_e], minval=0, maxval=5, dtype=tf.float32))
-        self.Wwi.assign(tf.random.uniform(shape=[self.n_i], minval=-5, maxval=0, dtype=tf.float32))
-        self.logTaue.assign(tf.random.uniform(shape=[self.n_e], minval=-7, maxval=2, dtype=tf.float32))
-        self.logTaui.assign(tf.random.uniform(shape=[self.n_i], minval=-7, maxval=2, dtype=tf.float32))
+        self.Jw = tf.random.uniform(shape=[M], minval=1, maxval=1, dtype=tf.float32)
+        self.logJw.assign(tf.math.log(self.Jw))
+        self.Wwe.assign(tf.random.uniform(shape=[self.n_e], minval=0.05, maxval=0.15, dtype=tf.float32))
+        self.Wwi.assign(tf.random.uniform(shape=[self.n_i], minval=-0.15, maxval=-0.05, dtype=tf.float32))
+        self.Taue = tf.random.uniform(shape=[self.n_e], minval=10, maxval=20, dtype=tf.float32)
+        self.logTaue.assign(tf.math.log(self.Taue))
+        self.Taui = tf.random.uniform(shape=[self.n_i], minval=5, maxval=10, dtype=tf.float32)
+        self.logTaui.assign(tf.math.log(self.Taui))
         # can initialise Th to anything as model is initially linear, and then Th will be initialised by another
         # routine when it becomes nonlinear
         self.Th.assign(tf.random.uniform(shape=[M], minval=-3, maxval=3, dtype=tf.float32))
-        self.logDelay.assign(tf.random.uniform(shape=[M], minval=-7, maxval=2, dtype=tf.float32))
-        self.v0.assign(tf.random.uniform(shape=(), minval=-5, maxval=5, dtype=tf.float32))
+        self.Delay = tf.random.uniform(shape=[M], minval=0.1, maxval=5, dtype=tf.float32)
+        self.logDelay.assign(tf.math.log(self.Delay))
+        self.v0.assign(tf.random.uniform(shape=(), minval=-0.1, maxval=0.1, dtype=tf.float32))
         self.params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
                        self.Th, self.logDelay)
         self.trainable_params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
                                  self.Th, self.logDelay)
+
+        if M == 1 and not self.sig_on[0]:
+            # if single subunit linear model, take out parameters from trainable_params list
+            self.logJw.assign([0])
+            self.trainable_params = (self.v0, self.Wwe, self.Wwi, self.logTaue, self.logTaui, self.logDelay)
 
         return
 
@@ -77,7 +96,8 @@ def grad(model, inputs, targets):
     with tf.GradientTape() as tape:
         tape.watch(model.trainable_params)
         loss_value = loss(model(inputs), targets)
-        grads = tape.gradient(loss_value, sources=model.trainable_params, unconnected_gradients=tf.UnconnectedGradients.NONE)
+        grads = tape.gradient(loss_value, sources=model.trainable_params,
+                              unconnected_gradients=tf.UnconnectedGradients.NONE)
     return loss_value, grads
 
 
@@ -97,7 +117,6 @@ def train(model, num_epochs, optimizer, inputs, target):
     return loss_values, accuracies
 
 
-
 def train_sgd(model, num_epochs, optimizer, inputs, target):
     """perform gradient descent training on a given hLN model for a specified number of epochs, while recording
     loss and accuracy information. Adjusted to perform SGD to prevent overfitting."""
@@ -112,7 +131,19 @@ def train_sgd(model, num_epochs, optimizer, inputs, target):
         accuracy = 100 * (1 - (loss_value/np.var(target[t_start:t_start + n_points])))
         loss_values.append(loss_value.numpy())
         accuracies.append(max(accuracy.numpy(), 0))
-        optimizer.apply_gradients(zip(grads, model.params))
+        optimizer.apply_gradients(zip(grads, model.trainable_params))
+
+    return loss_values, accuracies
+
+
+def train_lin_sgd(lin_model, num_epochs, optimizer, inputs, target):
+    """function to perform SGD training on a single subunit linear hLN model, while recording loss and accuracy
+     information. Differs from training of other architectures in order to speed up training. Jw taken out of trainable
+     parameters, as are the Wws. At each training step, a linear regression problem is solved to find the optimal
+     weights."""
+
+    loss_values = []
+    accuracies = []
 
     return loss_values, accuracies
 
