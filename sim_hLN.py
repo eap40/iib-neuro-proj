@@ -3,13 +3,10 @@
 
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as plt
 from utils import *
 from scipy import sparse as sps
 import seaborn as sns
 from gen_inputs import *
-
-sns.set()
 
 # pars = [v0, Jc, Jw, Wce, Wwe, Th, Tau, dTau, delay]
 
@@ -167,7 +164,6 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, sig_on, alpha=True, double=False, mu
         # if any found then condition
         for leaf in current_leaves:
             # apply the sigmoidal nonlinearity to the dendritic inputs for every leaf
-            # add option here for linear processing (if Th=none, just add Y row to R row)
             # define paddings - this way we can add non linearity output to whole R Tensor instead of assigning 1 row
             paddings = ([[leaf - 1, M - leaf], [0, 0]])
 
@@ -206,9 +202,88 @@ def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, sig_on, alpha=True, double=False, mu
     return v_soma
 
 
+@tf.function
+def sim_inputs(X, dt, Jc, Wce, Wci, params, sig_on, alpha=True, double=False, mult_inputs=False):
+    """Function to simulate synaptic input to all subunits. Essentially a cut off version of sim_hLN_tf,
+    that returns Y matrix before inputs from children are added and nonlinearities applied"""
 
+    # WILL NEED MORE PARAMETER CHECKS, ERROR MESSAGES ETC HERE BEFORE FUNCTION STARTS PROPER
+    v0, log_Jw, Wwe, Wwi, log_Tau_e, log_Tau_i, Th, log_Delay = params
 
+    # these parameters defined by their logs to ensure positivity - convert here
+    Jw, Tau_e, Tau_i, Delay = tf.exp(log_Jw), tf.exp(log_Tau_e), tf.exp(log_Tau_i), tf.exp(log_Delay)
 
+    N = X.shape[0]  # number of input neurons
+    n_e = tf.constant(629, dtype=tf.int32)
+    # tf.print(tf.concat(Wce, axis=0).shape)
+    # tf.print(n_e)
+    # n_e = np.concatenate(Wce).ravel().shape[0]  # number of excitatory neurons
+    # n_i = np.concatenate(Wci).ravel().shape[0]  # number of inhibitory neurons
+    L = X.shape[1]  # number of timesteps
+
+    M = len(Jc)  # number of subunits
+    # delay = np.zeros([M, 1])  # default delay to 0 for all subunits
+
+    # gain = Jw
+
+    # second calculate synaptic input to each dendritic branch
+    # Y = tf.zeros([M, L], dtype=tf.float32)  # this will be the matrix of inputs for each subunit at each given timestep
+    Ym_list = []
+    for m in range(M):
+
+        # create empty vector for each subunit - stack all of these at end to get full Y matrix
+        Y_m = tf.zeros(L, dtype=tf.float32)
+        # # subunit gain = Jw[m] * f'(0) - evaluated in the absence of inputs
+        # gain[m] = Jw[m]
+        #
+        # # Connectivity is defined from the root - soma - towards the leaves.
+        # # So the parent has already been processed when processing the leaves!
+        # total_gain[m] = gain[m]
+        # parent = Jc[m-1]
+        # if parent !=0:
+        #     total_gain[m] *= total_gain[parent]
+
+        # calculate synaptic input to each dendritic branch
+
+        # Wc.e, Wc.i: a list of M components. The component m is a vector indicating the neurons connected to branch m
+        # Ww.e, (Ww.e2), Ww.i: LISTS of M components indicating the synaptic weights associated to the neurons connected to branch m
+        if len(Wce[m]) > 0:  # if subunit has any excitatory neurons connected to it
+            # # need to swap out list(enumerate(Wce[m])) for something TF friendly
+            # synapses = tf.scan(lambda a, x: a + 1, elems=Wce[m], initializer=-1)
+            # synapses = tf.dtypes.cast(synapses, tf.int64)
+            # list_enum = tf.stack([synapses, Wce[m]], axis=1)
+            # print(list_enum)
+            synapse = 0
+            for neuron in Wce[m]:
+                if alpha:
+                    # add convolved input to Y matrix if alpha set true
+                    increment = int_spikes(X=X, dt=dt, Wc=Wce[m][synapse], Ww=Wwe[neuron], Tau=Tau_e[neuron],
+                                           delay=Delay[m])
+                    Y_m += increment
+
+                else:
+                    # add simple binary input if not
+                    Y_m += Wwe[m][synapse] * X[neuron]
+
+                synapse += 1  # changed to this format as tf didn't like list(enumerate) or aliases
+
+            # should be one weight linking each input neuron to each subunit
+        #
+        if len(Wci[m]) > 0:
+            # if inhibitory input exists for subunit, calculate response
+            synapse = 0
+            for neuron in Wci[m]:
+                Y_m += int_spikes(X=X, dt=dt, Wc=Wci[m][synapse], Ww=Wwi[neuron - n_e], Tau=Tau_i[neuron - n_e],
+                                  delay=Delay[m])
+                synapse += 1
+
+        # append Y_m to list of Y_ms, then stack them all at the end of the for loop in ms
+        Ym_list.append(Y_m)
+
+    # now stack all the Y_ms we stored during the loop
+    Y = tf.stack(Ym_list)
+
+    return Y
 
 
 

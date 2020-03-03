@@ -6,8 +6,6 @@ import itertools
 import copy
 
 
-sns.set()
-
 
 
 

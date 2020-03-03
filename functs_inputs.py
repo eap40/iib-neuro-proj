@@ -3,8 +3,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import truncexpon
 
-sns.set()
-
 # file containing smaller core functions required for larger input generation function
 
 def gen_poisson_events(Tmax, rate):
