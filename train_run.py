@@ -82,9 +82,9 @@ def run():
     # initialise 3n model to approximate 2n model, train
 
     # for continued training
+    
 
-
-def test_recovery(model, inputs, num_sims, enforce_params=False):
+def test_recovery(model, inputs, num_sims, n_attempts, num_epochs, learning_rate, enforce_params=False):
     """Function to test quality of parameter recovery for a a specified hLN model. For each simulation, function
     will generate a new target based on random parameters and attempt to fit. The final quality of fit will then
     be evaluated, as well as statistics concerning parameter recovery."""
@@ -96,9 +96,13 @@ def test_recovery(model, inputs, num_sims, enforce_params=False):
     train_inputs = inputs[:, :n_train]
     test_inputs = inputs[:, n_train:]
 
+    # create empty lists to store stats we want function to return
+    train_accuracies = []
     test_accuracies = []
-    param_stats = []
+    target_params_list = []
+    trained_params_list = []
 
+    # generate a number of different targets
     for sim in range(num_sims):
         # randomise the parameters before generating target
         model.randomise_parameters()
@@ -114,48 +118,74 @@ def test_recovery(model, inputs, num_sims, enforce_params=False):
         train_target = target[:n_train]
         test_target = target[n_train:]
         target_params = [param.numpy() for param in model.params]
+        target_params_list.append(target_params)
 
-        # Now try and recover parameters from this model: first randomise them again:
-        model.randomise_parameters()
+        # for each simulation (i.e. each target generated), we have multiple training attempts with different initial
+        # conditions each time. We then take the model with the best training accuracy out of these attempts for
+        # investigation of parameter recovery
+        # n_attempts = 5
 
-        # define optimizer
-        optimizer_1l = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=0.01)
-        # train model with SGD
-        loss_values, accuracies = train_sgd(model=model, num_epochs=10000, optimizer=optimizer_1l, inputs=train_inputs,
-                                            target=train_target)
+        # for each attempt, we want to store the final training accuracy, test accuracy and final model parameters
+        attempt_train_accuracies = [0]*n_attempts
+        attempt_test_accuracies = [0]*n_attempts
+        attempt_parameters = [0]*n_attempts
+
+        for attempt in range(n_attempts):
+
+            # Now try and recover parameters from this model: first randomise them again:
+            model.randomise_parameters()
+
+            # define optimizer
+            optimizer_1l = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=learning_rate)
+            # train model with SGD
+            loss_values, accuracies = train_sgd(model=model, num_epochs=num_epochs, optimizer=optimizer_1l,
+                                                inputs=train_inputs, target=train_target)
+
+            # compute final test and training losses, and store for later
+            test_loss = loss(predicted_v=model(test_inputs), target_v=test_target)
+            test_accuracy = 100 * (1 - (test_loss / np.var(test_target)))
+            train_loss = loss(predicted_v=model(train_inputs), target_v=train_target)
+            train_accuracy = 100 * (1 - (train_loss / np.var(train_target)))
+            attempt_test_accuracies[attempt] = test_accuracy
+            attempt_train_accuracies[attempt] = train_accuracy
+
+            # now store parameters
+            trained_params = [param.numpy() for param in model.params]
+            attempt_parameters[attempt] = trained_params
+
+        # now find attempt that produced maximum training accuracy, and use this for evaluation
+        max_index = attempt_train_accuracies.index(max(attempt_train_accuracies))
+        trained_params = attempt_parameters[max_index]
+        test_accuracies.append(attempt_test_accuracies[max_index])
+        train_accuracies.append(attempt_train_accuracies[max_index])
+
+        # save the final trained parameters
+        trained_params_list.append(trained_params)
 
 
-        test_loss = loss(predicted_v=model(test_inputs), target_v=test_target)
-        test_accuracy = 100 * (1 - (test_loss / np.var(target)))
-        test_accuracies.append(test_accuracy)
+        # # convert log parameters to normal for plotting
+        # log_params = [1, 4, 5, 7]
+        # for ind in log_params:
+        #     trained_params[ind] = np.exp(trained_params[ind])
+        #     target_params[ind] = np.exp(target_params[ind])
+        #
+        # # for single subunit linear model, only want these 4 parameters
+        # lin_indices = [0, 2, 4, 7]
+        # param_names = ["v0", "Wwe", "Taue", "Delay"]
+        #
+        # sim_stats=[]
+        # for i in range(len(param_names)):
+        #     p_trained, p_target = trained_params[lin_indices[i]].flatten(), target_params[lin_indices[i]].flatten()
+        #     if len(p_trained) > 1:
+        #         var_explained = 1 - ((p_trained - p_target) ** 2).mean() / np.var(p_target)
+        #         sim_stats.append(var_explained)
+        #     elif len(p_trained) == 1:
+        #         error = np.abs((p_trained[0] - p_target[0]) / p_target[0]) * 100
+        #         sim_stats.append(error)
+        #
+        # param_stats.append(sim_stats)
 
-        # now compare parameter recovery
-        trained_params = [param.numpy() for param in model.params]
-
-
-        # convert log parameters to normal for plotting
-        log_params = [1, 4, 5, 7]
-        for ind in log_params:
-            trained_params[ind] = np.exp(trained_params[ind])
-            target_params[ind] = np.exp(target_params[ind])
-
-        # for single subunit linear model, only want these 4 parameters
-        lin_indices = [0, 2, 4, 7]
-        param_names = ["v0", "Wwe", "Taue", "Delay"]
-
-        sim_stats=[]
-        for i in range(len(param_names)):
-            p_trained, p_target = trained_params[lin_indices[i]].flatten(), target_params[lin_indices[i]].flatten()
-            if len(p_trained) > 1:
-                var_explained = 1 - ((p_trained - p_target) ** 2).mean() / np.var(p_target)
-                sim_stats.append(var_explained)
-            elif len(p_trained) == 1:
-                error = np.abs((p_trained[0] - p_target[0]) / p_target[0]) * 100
-                sim_stats.append(error)
-
-        param_stats.append(sim_stats)
-
-    return test_accuracies, param_stats
+    return train_accuracies, test_accuracies, trained_params_list, target_params_list
 
 # if __name__ == '__main__':
 #     print('Beginning training procedure')
