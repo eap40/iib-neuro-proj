@@ -100,6 +100,24 @@ def grad(model, inputs, targets):
                               unconnected_gradients=tf.UnconnectedGradients.NONE)
     return loss_value, grads
 
+@tf.function
+def grad_subset(model, inputs, targets):
+    """find the value of loss function and its gradient with respect to the trainable parameters of the model. Update
+    for batch training, to only evaluate the loss on a subset of the batch data so as to reduce impact of inputs
+    outside the batch window"""
+
+    # define how much of the batch window we won't include in loss calculation - 100ms should be fine as target time
+    # constants are maximum 20ms to begin with
+    subset_delay = 100
+
+    with tf.GradientTape() as tape:
+        tape.watch(model.trainable_params)
+        loss_value = loss(model(inputs)[subset_delay:], targets[subset_delay:])
+        grads = tape.gradient(loss_value, sources=model.trainable_params,
+                              unconnected_gradients=tf.UnconnectedGradients.NONE)
+
+    return loss_value, grads
+
 
 # define training function
 def train(model, num_epochs, optimizer, inputs, target):
@@ -112,7 +130,7 @@ def train(model, num_epochs, optimizer, inputs, target):
         accuracy = 100 * (1 - (loss_value/np.var(target)))
         loss_values.append(loss_value.numpy())
         accuracies.append(max(accuracy.numpy(), 0))
-        optimizer.apply_gradients(zip(grads, model.params))
+        optimizer.apply_gradients(zip(grads, model.trainable_params))
 
     return loss_values, accuracies
 
@@ -126,8 +144,8 @@ def train_sgd(model, num_epochs, optimizer, inputs, target):
     n_train = int(len(target.numpy()))
     for epoch in tqdm(range(num_epochs)):
         t_start = int(np.random.uniform(0, n_train - n_points))
-        loss_value, grads = grad(model=model, inputs=inputs[:, t_start: t_start + n_points],
-                                 targets=target[t_start:t_start + n_points])
+        loss_value, grads = grad_subset(model=model, inputs=inputs[:, t_start: t_start + n_points],
+                                        targets=target[t_start:t_start + n_points])
         accuracy = 100 * (1 - (loss_value/np.var(target[t_start:t_start + n_points])))
         loss_values.append(loss_value.numpy())
         accuracies.append(max(accuracy.numpy(), 0))
