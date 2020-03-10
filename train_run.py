@@ -82,7 +82,7 @@ def run():
     # initialise 3n model to approximate 2n model, train
 
     # for continued training
-    
+
 
 def test_recovery(model, inputs, num_sims, n_attempts, num_epochs, learning_rate, enforce_params=False):
     """Function to test quality of parameter recovery for a a specified hLN model. For each simulation, function
@@ -133,13 +133,26 @@ def test_recovery(model, inputs, num_sims, n_attempts, num_epochs, learning_rate
         for attempt in range(n_attempts):
 
             # Now try and recover parameters from this model: first randomise them again:
-            model.randomise_parameters()
+            # model.randomise_parameters()
+
+            # Debugging inability to achieve 100% accuracy: randomise one parameter at a time and check recoverability
+            # first v0
+            # model.v0.assign(tf.random.uniform(shape=(), minval=-0.1, maxval=0.1, dtype=tf.float32))
+            # model.Wwe.assign(tf.random.uniform(shape=[model.n_e], minval=0.05, maxval=0.15, dtype=tf.float32))
+            # model.Taue = tf.random.uniform(shape=[model.n_e], minval=10, maxval=20, dtype=tf.float32)
+            # model.logTaue.assign(tf.math.log(model.Taue))
+            model.Delay = tf.random.uniform(shape=[1], minval=0.1, maxval=5, dtype=tf.float32)
+            model.logDelay.assign(tf.math.log(model.Delay))
 
             # define optimizer
             optimizer_1l = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=learning_rate)
             # train model with SGD
             loss_values, accuracies = train_sgd(model=model, num_epochs=num_epochs, optimizer=optimizer_1l,
                                                 inputs=train_inputs, target=train_target)
+
+            # # train without SGD on a whole dataset
+            # loss_values, accuracies = train(model=model, num_epochs=num_epochs, optimizer=optimizer_1l,
+            #                                     inputs=train_inputs, target=train_target)
 
             # compute final test and training losses, and store for later
             test_loss = loss(predicted_v=model(test_inputs), target_v=test_target)
