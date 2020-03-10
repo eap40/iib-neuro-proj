@@ -154,14 +154,26 @@ def train_sgd(model, num_epochs, optimizer, inputs, target):
     return loss_values, accuracies
 
 
-def train_lin_sgd(lin_model, num_epochs, optimizer, inputs, target):
-    """function to perform SGD training on a single subunit linear hLN model, while recording loss and accuracy
-     information. Differs from training of other architectures in order to speed up training. Jw taken out of trainable
-     parameters, as are the Wws. At each training step, a linear regression problem is solved to find the optimal
-     weights."""
+def train_sgd_decay(model, num_epochs, initial_rate, inputs, target, decay):
+    """perform gradient descent training on a given hLN model for a specified number of epochs, while recording
+    loss and accuracy information. Adjusted to perform SGD to prevent overfitting."""
+    # create decaying learning rates
+    iterations = np.arange(0, num_epochs, 1)
+    l_rates = initial_rate * (1 / (1 + decay * iterations))
 
     loss_values = []
     accuracies = []
+    n_points = 1000
+    n_train = int(len(target.numpy()))
+    for epoch in tqdm(range(num_epochs)):
+        t_start = int(np.random.uniform(0, n_train - n_points))
+        loss_value, grads = grad_subset(model=model, inputs=inputs[:, t_start: t_start + n_points],
+                                        targets=target[t_start:t_start + n_points])
+        accuracy = 100 * (1 - (loss_value / np.var(target[t_start:t_start + n_points])))
+        loss_values.append(loss_value.numpy())
+        accuracies.append(max(accuracy.numpy(), 0))
+        optimizer = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=l_rates[epoch])
+        optimizer.apply_gradients(zip(grads, model.trainable_params))
 
     return loss_values, accuracies
 
