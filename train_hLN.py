@@ -51,7 +51,7 @@ class hLN_Model(object):
 
 
     def __call__(self, x):
-        return sim_hLN_tf(X=x, dt=1, Jc=self.Jc, Wce=self.Wce, Wci=self.Wci, params=self.params, sig_on=self.sig_on)
+        return sim_hLN_tf2(X=x, dt=1, Jc=self.Jc, Wce=self.Wce, Wci=self.Wci, params=self.params, sig_on=self.sig_on)
 
     def randomise_parameters(self):
         M = len(self.Jc)
@@ -97,7 +97,7 @@ def grad(model, inputs, targets):
         tape.watch(model.trainable_params)
         loss_value = loss(model(inputs), targets)
         grads = tape.gradient(loss_value, sources=model.trainable_params,
-                              unconnected_gradients=tf.UnconnectedGradients.NONE)
+                              unconnected_gradients=tf.UnconnectedGradients.ZERO)
     return loss_value, grads
 
 @tf.function
