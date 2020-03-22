@@ -144,14 +144,19 @@ def test_recovery(model, inputs, num_sims, n_attempts, num_epochs, learning_rate
             # model.Delay = tf.random.uniform(shape=[1], minval=0.1, maxval=5, dtype=tf.float32)
             # model.logDelay.assign(tf.math.log(model.Delay))
 
-            # define optimizer
+            # define optimizer - vanilla
             optimizer_1l = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=learning_rate)
+
+            # adam optimizer
+            optimizer_adam = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-07,
+                                                      amsgrad=False)
+
             # train model with SGD
             # loss_values, accuracies = train_sgd(model=model, num_epochs=num_epochs, optimizer=optimizer_1l,
             #                                     inputs=train_inputs, target=train_target)
 
             # # train without SGD on a whole dataset
-            loss_values, accuracies = train(model=model, num_epochs=num_epochs, optimizer=optimizer_1l,
+            loss_values, accuracies = train(model=model, num_epochs=num_epochs, optimizer=optimizer_adam,
                                                 inputs=train_inputs, target=train_target)
 
             # compute final test and training losses, and store for later
