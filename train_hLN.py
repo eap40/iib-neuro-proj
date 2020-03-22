@@ -21,8 +21,7 @@ class hLN_Model(object):
         M = len(Jc)
         self.n_e = np.concatenate(Wce).ravel().shape[0]
         self.n_i = np.concatenate(Wci).ravel().shape[0]
-        self.Jc, self.Wce, self.Wci, self.sig_on = Jc, tf.ragged.constant(Wce, dtype=tf.int32), \
-                                                   tf.ragged.constant(Wci, dtype=tf.int32), sig_on
+        self.Jc, self.Wce, self.Wci, self.sig_on = Jc, Wce, Wci, sig_on
         self.Jw = tf.random.uniform(shape=[M], minval=1, maxval=1, dtype=tf.float32)
         self.logJw = tf.Variable(tf.math.log(self.Jw))
         self.Wwe = tf.Variable(tf.random.uniform(shape=[self.n_e], minval=0.05, maxval=0.15, dtype=tf.float32))
