@@ -320,22 +320,30 @@ def sim_hLN_tf2(X, dt, Jc, Wce, Wci, params, sig_on):
     # synapses within each subunit
 
     Ym_list = []  # empty list to store synaptic input vector for each subunit
+    # then concatenate excitatory and inhibitory parameters for easier convolution
+    Taus = tf.concat((Taue, Taui), axis=0)
+    Wws = tf.concat((Wwe, Wwi), axis=0)
 
     for m in range(M):
 
         # create empty vector for each subunit - stack all of these at end to get full Y matrix
         Ym = tf.zeros(shape=(1, L), dtype=tf.float32)
 
-        if len(Wce[m]) > 0:  # if subunit has any excitatory neurons connected to it
+        # concatenate Wce[m] and Wci[m] and then check if full: then we can keep the existing Wce syntax to work
+        # for both inhibitory and excitatory synapses in 1 convolution
 
-            n_syn = len(Wce[m])
+        Wc = tf.concat((Wce[m], Wci[m]), axis=0)
+
+        if len(Wc) > 0:  # if subunit has any neurons connected to it: multiple conditions
+            # so we only have to do one convolution
+            n_syn = len(Wc)
 
             # create alpha kernel matrix, one row for each excitatory synapse. Then convolve kernel matrix with
             # the input rows corresponding to the subunit excitatory input neurons
 
             # find Taus for all subunit synapses, then find maximum of these
-            Taus_m = tf.gather(Taue, Wce[m])
-            Wwes_m = tf.gather(Wwe, Wce[m])
+            Taus_m = tf.gather(Taus, Wc)
+            Wws_m = tf.gather(Wws, Wc)
             Tau_max = tf.math.reduce_max(Taus_m)
             # kernel decays quickly, so only consider times up to 10 * max(tau) after spikes - this will be the
             # length of the filter
@@ -346,11 +354,11 @@ def sim_hLN_tf2(X, dt, Jc, Wce, Wci, params, sig_on):
             filt_times = tf.tile(tf.reshape(tf.range(0, filt_length, dt), (1, filt_length)), (n_syn, 1))
             filt_times = tf.cast(filt_times, tf.float32)
             filt = ((filt_times - Delay[m]) / tf.reshape(Taus_m, (n_syn, 1))) * tf.math.exp(
-                -(filt_times - Delay[m]) / tf.reshape(Taus_m, (n_syn, 1))) * tf.reshape(Wwes_m, (n_syn, 1))
+                -(filt_times - Delay[m]) / tf.reshape(Taus_m, (n_syn, 1))) * tf.reshape(Wws_m, (n_syn, 1))
             filt = tf.clip_by_value(filt, clip_value_min=0, clip_value_max=10)
 
             # now select input rows we will convolve with, according to values in Wce[m]
-            X_m = tf.gather_nd(X, tf.reshape(Wce[0], (n_syn, 1)))
+            X_m = tf.gather_nd(X, tf.reshape(Wc, (n_syn, 1)))
 
             # we have the filter and the input, now extend the inputs and convolve
             X_extend = tf.concat((tf.zeros((n_syn, int(filt_length / 2)), dtype=tf.float32), X_m), axis=1)
