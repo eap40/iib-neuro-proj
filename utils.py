@@ -236,6 +236,6 @@ def create_weights(Jc, n_levels, clusts):
 
     Wci[0] = np.insert(Wci[0], 0, n_e)  # attach first inhibitory neuron to soma
 
-    return np.array(Wce), np.array(Wci)
+    return np.array(Wce, dtype=np.int32), np.array(Wci, dtype=np.int32)
 
 
