@@ -175,3 +175,18 @@ def box_params_1l(trained_params, target_params, name="name", save=False):
 
     plt.show()
 
+
+def box_accuracies(accuracies, labels):
+    """function to create box plots of training and test accuracies after optimization"""
+    # box plot of recovered accuracies in hLN models
+    # matplotlib.rcParams.update({'font.size': 18})
+    fig, ax = plt.subplots()
+    ax.set_title('Boxplot of training dataset accuracies', fontsize=14)
+    ax.boxplot(accuracies)
+    ax.set_xticklabels(labels, fontsize=14)
+    ax.set_ylabel("Accuracy (%)")
+#     ax.set_ylim(99.9,100.01)
+    # ax.set_ylim(100)
+
+    plt.show()
+
