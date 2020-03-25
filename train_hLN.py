@@ -113,7 +113,7 @@ def grad_subset(model, inputs, targets):
         tape.watch(model.trainable_params)
         loss_value = loss(model(inputs)[subset_delay:], targets[subset_delay:])
         grads = tape.gradient(loss_value, sources=model.trainable_params,
-                              unconnected_gradients=tf.UnconnectedGradients.NONE)
+                              unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
     return loss_value, grads
 
