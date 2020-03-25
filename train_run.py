@@ -112,10 +112,9 @@ def test_recovery(model, inputs, num_sims, n_attempts, num_epochs, learning_rate
             model.logTaue.assign(np.log(np.full(2, np.random.uniform(low=10, high=20))))
 
         # generate target with new parameters
-        target = model(train_inputs)
+        train_target = model(train_inputs)
 
         # store parameters of the target model, and split the target into training and test sets
-        train_target = target[:n_train]
         test_target = model(test_inputs)
         target_params = [param.numpy() for param in model.params]
         target_params_list.append(target_params)
@@ -148,16 +147,16 @@ def test_recovery(model, inputs, num_sims, n_attempts, num_epochs, learning_rate
             optimizer_1l = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=learning_rate)
 
             # adam optimizer
-            optimizer_adam = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-07,
-                                                      amsgrad=False)
+            optimizer_adam = tf.keras.optimizers.Adam(learning_rate=learning_rate, beta_1=0.9, beta_2=0.999,
+                                                      epsilon=1e-07, amsgrad=False)
 
             # train model with SGD
-            # loss_values, accuracies = train_sgd(model=model, num_epochs=num_epochs, optimizer=optimizer_1l,
-            #                                     inputs=train_inputs, target=train_target)
+            loss_values, accuracies = train_sgd(model=model, num_epochs=num_epochs, optimizer=optimizer_adam,
+                                                inputs=train_inputs, target=train_target)
 
             # # train without SGD on a whole dataset
-            loss_values, accuracies = train(model=model, num_epochs=num_epochs, optimizer=optimizer_adam,
-                                                inputs=train_inputs, target=train_target)
+            # loss_values, accuracies = train(model=model, num_epochs=num_epochs, optimizer=optimizer_adam,
+            #                                     inputs=train_inputs, target=train_target)
 
             # compute final test and training losses, and store for later
             test_loss = loss(predicted_v=model(test_inputs), target_v=test_target)
