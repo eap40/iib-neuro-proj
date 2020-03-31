@@ -147,7 +147,7 @@ def plot_params_1li(trained_params, target_params, name="name", save=False):
     trained_params, target_params = np.array(trained_params), np.array(target_params)
 
     fig, ax = plt.subplots(nrows=2, ncols=3)
-    fig.set_size_inches(15, 10)
+    fig.set_size_inches(18, 12)
 
     # extract the linear parameters we want for plotting
     trained_v0s, target_v0s = trained_params[:, 0], target_params[:, 0]
@@ -164,10 +164,10 @@ def plot_params_1li(trained_params, target_params, name="name", save=False):
                                                 np.exp(target_logDelays)
 
     # store all linear parameters in list
-    lin_target_params = [target_v0s, target_Wwes, target_Wwis, target_Taues, target_Tauis, target_Delays]
-    lin_trained_params = [trained_v0s, trained_Wwes, trained_Wwis, trained_Taues, trained_Tauis, trained_Delays]
+    lin_target_params = [target_Wwes, target_Wwis, target_v0s,  target_Taues, target_Tauis, target_Delays]
+    lin_trained_params = [trained_Wwes, trained_Wwis, trained_v0s, trained_Taues, trained_Tauis, trained_Delays]
 
-    param_names = ["v0", "Wwe", "Wwi", "Taue", "Taui", "Delay"]
+    param_names = ["Wwe", "Wwi", "v0", "Taue", "Taui", "Delay"]
     i = 0
     for row in range(2):
         for col in range(3):
