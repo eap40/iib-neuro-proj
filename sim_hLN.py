@@ -354,8 +354,9 @@ def sim_hLN_tf2(X, dt, Jc, Wce, Wci, params, sig_on):
             filt_times = tf.tile(tf.reshape(tf.range(0, filt_length, dt), (1, filt_length)), (n_syn, 1))
             filt_times = tf.cast(filt_times, tf.float32)
             filt = ((filt_times - Delay[m]) / tf.reshape(Taus_m, (n_syn, 1))) * tf.math.exp(
-                -(filt_times - Delay[m]) / tf.reshape(Taus_m, (n_syn, 1))) * tf.reshape(Wws_m, (n_syn, 1))
+                -(filt_times - Delay[m]) / tf.reshape(Taus_m, (n_syn, 1)))
             filt = tf.clip_by_value(filt, clip_value_min=0, clip_value_max=10)
+            filt = filt * tf.reshape(Wws_m, (n_syn, 1))
 
             # now select input rows we will convolve with, according to values in Wce[m]
             X_m = tf.gather_nd(X, tf.reshape(Wc, (n_syn, 1)))
