@@ -1,12 +1,7 @@
 import numpy as np
 from scipy import sparse as sps
-import seaborn as sns
 import tensorflow as tf
 import itertools
-import copy
-
-
-
 
 
 def binary_input(M, L, kind='rand', delay=0):

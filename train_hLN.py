@@ -6,7 +6,6 @@ from sim_hLN import *
 from init_hLN import *
 from utils import *
 from tqdm import tqdm
-# from plot import *
 
 matplotlib.rcParams["legend.frameon"] = False
 

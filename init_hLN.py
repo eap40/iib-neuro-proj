@@ -3,13 +3,9 @@
 # previously containing linear subunits. <update_architecture> will add new linear subunits to an existing
 # architecture, which should essentially involve just redistributing inputs.
 
-import tensorflow as tf
-import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
 from sim_hLN import *
 from utils import *
-import copy
+
 
 # @tf.function
 def init_nonlin(X, model, lin_model, nSD, dt=1):

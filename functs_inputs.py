@@ -1,6 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 from scipy.stats import truncexpon
 
 # file containing smaller core functions required for larger input generation function

@@ -1,22 +1,8 @@
 # a script to simulate a hierarchical linear non-linear model and its response
-# first draft should be simplest skeleton of Ujfalussy full R script that can take inputs and produce and output
 
-import numpy as np
-import tensorflow as tf
+
 from utils import *
-from scipy import sparse as sps
-import seaborn as sns
-from gen_inputs import *
 
-# pars = [v0, Jc, Jw, Wce, Wwe, Th, Tau, dTau, delay]
-
-
-# to define:
-# subunit parameters:
-
-
-Jc_sing = np.array([0])
-Jc_five = np.array([0, 1, 1, 1, 1])
 
 @tf.function
 def sim_hLN_tf(X, dt, Jc, Wce, Wci, params, sig_on, alpha=True, double=False, mult_inputs=False):

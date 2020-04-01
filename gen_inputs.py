@@ -108,10 +108,14 @@ def spikes_to_input(spikes, Tmax):
     return bin_array
 
 
-
-# E_spikes, I_spikes = gen_realistic_inputs(Tmax=1000)
 #
-# print(E_spikes.shape)
+# E_spikes, I_spikes = gen_realistic_inputs(Tmax=3000)
+# #
+# X_e = spikes_to_input(E_spikes, Tmax=48000)
+# X_i = spikes_to_input(I_spikes, Tmax=48000)
+# X_tot = np.vstack((X_e, X_i))
+#
+# np.save("Data/inputs_equalrate.npy", X_tot)
 #
 #
 # print(spikes_to_input(E_spikes, Tmax=16000))
