@@ -4,74 +4,76 @@ from train_hLN import *
 def run():
     """Training procedure here"""
 
-    # define hierarchical clustering of input ensembles
-    clusts = [[[[[0, 1], [2]], [[3, 4], [5, 6]]], [[[7, 8], [9]], [[10, 11], [12]]]]]
-
-    ### Define the different hLN architectures we will be using:
-    # 1N
-    Jc_1n = np.array([0])
-    # 2N
-    Jc_2n = np.array([0, 1, 1])
-    # 3N
-    Jc_3n = np.array([0, 1, 1, 2, 2, 3, 3])
-    # 4N
-    Jc_4n = np.array([0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7])
-
-    # Get some realistic inputs
-    X_tot = tf.convert_to_tensor(np.load('Data/real_inputs.npy'), dtype=tf.float32)  # real inputs made earlier
-    X_e = X_tot[:629]  # 629 excitatory inputs, in 13 ensembles
-    X_i = X_tot[629:]  # 120 inhibitory inputs, also in 13 ensembles
-    # remember 1st inhibitory inputs is the somatic input - must always go to root subunit
-    inputs = X_tot
-
-
-    # Split the data into training and test sets, 80/20 initially
-    split = 0.8
-    L = inputs.shape[1]
-    n_train = int(L * split)
-    train_inputs = inputs[:, :n_train]
-    test_inputs = inputs[:, n_train:]
-
-    # create the Wcs based on the model and clusts
-    Wce_1l, Wci_1l = create_weights(Jc_1l, n_levels=1, clusts=clusts)
-    Wce_2n, Wci_2n = create_weights(Jc_2n, n_levels=2, clusts=clusts)
-    Wce_3n, Wci_3n = create_weights(Jc_3n, n_levels=3, clusts=clusts)
-    Wce_4n, Wci_4n = create_weights(Jc_4n, n_levels=4, clusts=clusts)
-
-    # initialise a known version each of the models to generate data with: save the parameter somewhere
-    hln_1l = hLN_Model(Jc=Jc_1n, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
-    params_1l = [param.numpy() for param in hln_1l.params]
-    np.save("Data/params_1l.npy", np.array(params_1l))
-
-    # select the parameters of the model that generated the data
-    target_params = params_1l
-
-    # generate output data from realistic inputs
-    target_1l = hln_1l(inputs)
-    # target_1l = tf.convert_to_tensor(np.load('../Data/target.npy'), dtype=tf.float32)  # real output made earlier
-    np.save("Data/target_1l.npy", target_1l.numpy())
-
-    # split target into training and test data
-    train_target = target_1l[:n_train]
-    test_target = target_1l[n_train:]
-
-
-    # randomise the parameters of hln_1l, start training
-    hln_1l.randomise_parameters()
-    # initialise 1L model, and optimise for data
-    # define optimizer
-    optimizer_1l = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=0.005)
-    # train model with SGD
-    loss_values_1l, accuracies_1l = train_lin_sgd(model=hln_1l, num_epochs=1000, optimizer=optimizer_1l,
-                                                  inputs=train_inputs, target=train_target)
-
-    # when to stop training? when performance on test data doesnt increase significantly each say 1000 epochs
-
-    # visualise training graph and save without viewing, same for parameter graphs, also save stats
-    # visualise results from 1L training
-    plot_loss_acc(loss_values=loss_values_1l, accuracies=accuracies_1l, save=True, name="Figures/loss_acc_1l.png")
-
-    plot_params(model=hln_1l, target_params=target_params)
+    loss_value = loss(0, 1)
+    print(f"Loss value={loss_value}")
+    # # define hierarchical clustering of input ensembles
+    # clusts = [[[[[0, 1], [2]], [[3, 4], [5, 6]]], [[[7, 8], [9]], [[10, 11], [12]]]]]
+    #
+    # ### Define the different hLN architectures we will be using:
+    # # 1N
+    # Jc_1n = np.array([0])
+    # # 2N
+    # Jc_2n = np.array([0, 1, 1])
+    # # 3N
+    # Jc_3n = np.array([0, 1, 1, 2, 2, 3, 3])
+    # # 4N
+    # Jc_4n = np.array([0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7])
+    #
+    # # Get some realistic inputs
+    # X_tot = tf.convert_to_tensor(np.load('Data/real_inputs.npy'), dtype=tf.float32)  # real inputs made earlier
+    # X_e = X_tot[:629]  # 629 excitatory inputs, in 13 ensembles
+    # X_i = X_tot[629:]  # 120 inhibitory inputs, also in 13 ensembles
+    # # remember 1st inhibitory inputs is the somatic input - must always go to root subunit
+    # inputs = X_tot
+    #
+    #
+    # # Split the data into training and test sets, 80/20 initially
+    # split = 0.8
+    # L = inputs.shape[1]
+    # n_train = int(L * split)
+    # train_inputs = inputs[:, :n_train]
+    # test_inputs = inputs[:, n_train:]
+    #
+    # # create the Wcs based on the model and clusts
+    # Wce_1l, Wci_1l = create_weights(Jc_1l, n_levels=1, clusts=clusts)
+    # Wce_2n, Wci_2n = create_weights(Jc_2n, n_levels=2, clusts=clusts)
+    # Wce_3n, Wci_3n = create_weights(Jc_3n, n_levels=3, clusts=clusts)
+    # Wce_4n, Wci_4n = create_weights(Jc_4n, n_levels=4, clusts=clusts)
+    #
+    # # initialise a known version each of the models to generate data with: save the parameter somewhere
+    # hln_1l = hLN_Model(Jc=Jc_1n, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
+    # params_1l = [param.numpy() for param in hln_1l.params]
+    # np.save("Data/params_1l.npy", np.array(params_1l))
+    #
+    # # select the parameters of the model that generated the data
+    # target_params = params_1l
+    #
+    # # generate output data from realistic inputs
+    # target_1l = hln_1l(inputs)
+    # # target_1l = tf.convert_to_tensor(np.load('../Data/target.npy'), dtype=tf.float32)  # real output made earlier
+    # np.save("Data/target_1l.npy", target_1l.numpy())
+    #
+    # # split target into training and test data
+    # train_target = target_1l[:n_train]
+    # test_target = target_1l[n_train:]
+    #
+    #
+    # # randomise the parameters of hln_1l, start training
+    # hln_1l.randomise_parameters()
+    # # initialise 1L model, and optimise for data
+    # # define optimizer
+    # optimizer_1l = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=0.005)
+    # # train model with SGD
+    # loss_values_1l, accuracies_1l = train_lin_sgd(model=hln_1l, num_epochs=1000, optimizer=optimizer_1l,
+    #                                               inputs=train_inputs, target=train_target)
+    #
+    # # when to stop training? when performance on test data doesnt increase significantly each say 1000 epochs
+    #
+    # # visualise training graph and save without viewing, same for parameter graphs, also save stats
+    # # visualise results from 1L training
+    # plot_loss_acc(loss_values=loss_values_1l, accuracies=accuracies_1l, save=True, name="Figures/loss_acc_1l.png")
+    #
+    # plot_params(model=hln_1l, target_params=target_params)
 
 
 
@@ -204,6 +206,6 @@ def test_recovery(model, inputs, num_sims, n_attempts, num_epochs, learning_rate
 
     return train_accuracies, test_accuracies, trained_params_list, target_params_list
 
-# if __name__ == '__main__':
-#     print('Beginning training procedure')
-#     run()
+if __name__ == '__main__':
+    print('Beginning training procedure')
+    run()
