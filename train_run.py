@@ -1,11 +1,19 @@
 ### File for running more complex training procedures, neater than a Jupyter notebook
 from train_hLN import *
+from gen_inputs import *
 
 def run():
     """Training procedure here"""
 
-    X_tot = tf.convert_to_tensor(np.load('Data/real_inputs.npy'), dtype=tf.float32)  # real inputs made earlier
-    inputs=X_tot
+    # Lets generate some inputs this time
+    E_spikes, I_spikes = gen_realistic_inputs(Tmax=3000)
+    #
+    X_e = spikes_to_input(E_spikes, Tmax=48000)
+    X_i = spikes_to_input(I_spikes, Tmax=48000)
+    X_tot = np.vstack((X_e, X_i))
+
+    # X_tot = tf.convert_to_tensor(np.load('Data/real_inputs.npy'), dtype=tf.float32)  # real inputs made earlier
+    inputs=tf.convert_to_tensor(X_tot, dtype=tf.float32)
 
     # 1L
     Jc_1l = np.array([0])

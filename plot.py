@@ -242,7 +242,7 @@ def box_accuracies(accuracies, labels):
     # box plot of recovered accuracies in hLN models
     # matplotlib.rcParams.update({'font.size': 18})
     fig, ax = plt.subplots()
-    ax.set_title('Boxplot of training dataset accuracies', fontsize=14)
+    ax.set_title('Boxplot of accuracies after model training', fontsize=14)
     ax.boxplot(accuracies)
     ax.set_xticklabels(labels, fontsize=14)
     ax.set_ylabel("Accuracy (%)")
