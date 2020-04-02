@@ -4,6 +4,24 @@ from train_hLN import *
 def run():
     """Training procedure here"""
 
+    X_tot = tf.convert_to_tensor(np.load('Data/real_inputs.npy'), dtype=tf.float32)  # real inputs made earlier
+    inputs=X_tot
+
+    # 1L
+    Jc_1l = np.array([0])
+
+    # list of lists for to define hierarchical clustering
+    clusts = [[[[[0, 1], [2]], [[3, 4], [5, 6]]], [[[7, 8], [9]], [[10, 11], [12]]]]]
+    Wce_mult, Wci_mult = create_weights(Jc=Jc_1l, n_levels=1, clusts=clusts)
+
+    hln_fix = hLN_Model(Jc=Jc_1l, Wce=Wce_mult, Wci=Wci_mult, sig_on=tf.constant([False]))
+    train_accs_fix, test_accs_fix, trained_plist_fix, target_plist_fix = test_recovery(model=hln_fix,
+                                                                                       inputs=inputs, num_sims=1,
+                                                                                       n_attempts=1, num_epochs=5000,
+                                                                                       learning_rate=0.001)
+
+    "Training completed"
+
     loss_value = loss(0, 1)
     print(f"Loss value={loss_value}")
     # # define hierarchical clustering of input ensembles
