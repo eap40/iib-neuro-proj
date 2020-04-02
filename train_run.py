@@ -24,9 +24,13 @@ def run():
 
     hln_fix = hLN_Model(Jc=Jc_1l, Wce=Wce_mult, Wci=Wci_mult, sig_on=tf.constant([False]))
     train_accs_fix, test_accs_fix, trained_plist_fix, target_plist_fix = test_recovery(model=hln_fix,
-                                                                                       inputs=inputs, num_sims=1,
-                                                                                       n_attempts=1, num_epochs=5000,
+                                                                                       inputs=inputs, num_sims=10,
+                                                                                       n_attempts=1, num_epochs=10000,
                                                                                        learning_rate=0.001)
+
+    np.savez_compressed('/scratch/eap40/training_data', a=train_accs_fix, b=test_accs_fix, c=trained_plist_fix,
+                        d=target_plist_fix)
+
 
     "Training completed"
 
