@@ -19,12 +19,14 @@ def run():
     # define target model for validate_fit function
     # list of lists for to define hierarchical clustering
     clusts = [[[[[0, 1], [2]], [[3, 4], [5, 6]]], [[[7, 8], [9]], [[10, 11], [12]]]]]
+    Jc_1l = np.array([0])
     Jc_2n = np.array([0, 1, 1])
+    Wce_1l, Wci_1l = create_weights(Jc_1l, n_levels=1, clusts=clusts)
     Wce_2n, Wci_2n = create_weights(Jc_2n, n_levels=2, clusts=clusts)
-    hln_2n = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
+    hln_1n = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
 
     # validate_fit function
-    target_params, trained_param_list = validate_fit(target_model=hln_2n, num_sims=1, inputs=inputs)
+    target_params, trained_param_list = validate_fit(target_model=hln_1n, num_sims=1, inputs=inputs)
 
     # save data
     np.savez_compressed('/scratch/eap40/training_data', a=target_params, b=trained_param_list)
