@@ -68,7 +68,7 @@ def init_nonlin(X, model, lin_model, nSD, dt=1):
 
         range_Y = np.std(Y[leaf - 1, :])
         alpha = (nSD * range_Y)
-        print(alpha)
+        # print(alpha)
         if len(Wce[leaf-1] > 0):  # if leaf has any e neurons connected to it
             Wwe[(Wce[leaf-1])] /= alpha
         if len(Wci[leaf-1] > 0):  # if leaf has any i neurons connected to it
@@ -190,17 +190,23 @@ def update_arch(prev_model, next_model):
     # first change hLN attributes into numpy - allows assignment and should be easier to manipulate
     logJw = next_model.logJw.numpy()
     logDelay = next_model.logDelay.numpy()
+    Th = next_model.Th.numpy()
 
+    # then initialise 'substructure' of new model to be identical to previous model (i.e. subsection of new
+    # architecture that made up the previous model)
+    M_old = len(prev_model.Jc)
+    logJw[:M_old] = prev_model.logJw.numpy()
+    logDelay[:M_old] = prev_model.logDelay.numpy()
+    Th[:M_old] = prev_model.Th.numpy()
 
     # work out which subunits we have just added - for these cases should just be the leaves
     M = len(next_model.Jc)
-    leaves = np.setdiff1d(np.arange(1, M+1, 1), next_model.Jc)
+    leaves = np.setdiff1d(np.arange(1, M + 1, 1), next_model.Jc)
     for leaf in leaves:
-        logJw[leaf-1] = 0  # set subunit gain to 1 for all new leaves
+        logJw[leaf - 1] = 0  # set subunit gain to 1 for all new leaves
         # then set delay to the delay of the subunit parent from the previous model
-        parent = next_model.Jc[leaf-1]
-        logDelay[leaf-1] = prev_model.logDelay.numpy()[parent-1]
-
+        parent = next_model.Jc[leaf - 1]
+        logDelay[leaf - 1] = prev_model.logDelay.numpy()[parent - 1]
 
 
     # assign the newly calculated parameters to the new model
@@ -210,5 +216,8 @@ def update_arch(prev_model, next_model):
     next_model.logTaui.assign(prev_model.logTaui)
     next_model.logJw.assign(logJw)
     next_model.logDelay.assign(logDelay)
+    next_model.Th.assign(Th)
+    next_model.v0.assign(prev_model.v0)
 
     return
+
