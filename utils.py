@@ -200,8 +200,8 @@ def create_weights(Jc, n_levels, clusts):
 
     M = len(Jc)  # number of subunits
     # create empty lists to store weights in
-    Wce = [np.array([], dtype=int) for i in range(M)]
-    Wci = [np.array([], dtype=int) for i in range(M)]
+    Wce = [np.array([], dtype=np.int32) for i in range(M)]
+    Wci = [np.array([], dtype=np.int32) for i in range(M)]
 
     # find leaves - subunits that don't take inputs from other subunits
     leaves = np.setdiff1d(np.arange(1, M + 1, 1), Jc)
@@ -225,12 +225,12 @@ def create_weights(Jc, n_levels, clusts):
 
         e_finish = esyn_cum[max(ens)]
         i_finish = n_e + isyn_cum[max(ens)]
-        Wce[leaf - 1] = np.arange(e_start, e_finish, 1)
-        Wci[leaf - 1] = np.arange(i_start, i_finish,
-                                  1) + 1  # add one as first inhibitory neuron is always connected to soma
+        Wce[leaf - 1] = np.arange(e_start, e_finish, 1, dtype=np.int32)
+        Wci[leaf - 1] = np.arange(i_start, i_finish, 1, dtype=np.int32) + 1
+        # add one as first inhibitory neuron is always connected to soma
 
     Wci[0] = np.insert(Wci[0], 0, n_e)  # attach first inhibitory neuron to soma
 
-    return np.array(Wce, dtype=np.int32), np.array(Wci, dtype=np.int32)
+    return Wce, Wci
 
 
