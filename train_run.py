@@ -15,105 +15,125 @@ def run():
     # X_tot = tf.convert_to_tensor(np.load('Data/real_inputs.npy'), dtype=tf.float32)  # real inputs made earlier
     inputs=tf.convert_to_tensor(X_tot, dtype=tf.float32)
 
+
+    # define target model for validate_fit function
+    # list of lists for to define hierarchical clustering
+    clusts = [[[[[0, 1], [2]], [[3, 4], [5, 6]]], [[[7, 8], [9]], [[10, 11], [12]]]]]
+    Jc_2n = np.array([0, 1, 1])
+    Wce_2n, Wci_2n = create_weights(Jc_2n, n_levels=2, clusts=clusts)
+    hln_2n = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
+
+    # validate_fit function
+    target_params, trained_param_list = validate_fit(target_model=hln_2n, num_sims=1, inputs=inputs)
+
+    # save data
+    np.savez_compressed('/scratch/eap40/training_data', a=target_params, b=trained_param_list)
+
+    print("Procedure finished")
+
+
+def validate_fit(target_model, num_sims, inputs):
+    """Function to validate the model fitting procedure, producing output similar to that in Figure S2 of the
+    Ujfalussy paper. Finds the performance of different models (1L-4N) in approximating a target signal generated
+    by hLN model target_model. Repeats the procedure for num_sims settings of the target model parameters."""
+
+    ### Define the different hLN architectures we will be using:
     # 1L
     Jc_1l = np.array([0])
+    # 1N
+    Jc_1n = np.array([0])
+    # 2N
+    Jc_2n = np.array([0, 1, 1])
+    # 3N
+    Jc_3n = np.array([0, 1, 1, 2, 2, 3, 3])
+    # 4N
+    Jc_4n = np.array([0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7])
 
     # list of lists for to define hierarchical clustering
     clusts = [[[[[0, 1], [2]], [[3, 4], [5, 6]]], [[[7, 8], [9]], [[10, 11], [12]]]]]
-    Wce_mult, Wci_mult = create_weights(Jc=Jc_1l, n_levels=1, clusts=clusts)
 
-    hln_fix = hLN_Model(Jc=Jc_1l, Wce=Wce_mult, Wci=Wci_mult, sig_on=tf.constant([False]))
-    train_accs_fix, test_accs_fix, trained_plist_fix, target_plist_fix = test_recovery(model=hln_fix,
-                                                                                       inputs=inputs, num_sims=10,
-                                                                                       n_attempts=1, num_epochs=10000,
-                                                                                       learning_rate=0.001)
+    Wce_1l, Wci_1l = create_weights(Jc_1l, n_levels=1, clusts=clusts)
+    Wce_2n, Wci_2n = create_weights(Jc_2n, n_levels=2, clusts=clusts)
+    Wce_3n, Wci_3n = create_weights(Jc_3n, n_levels=3, clusts=clusts)
+    Wce_4n, Wci_4n = create_weights(Jc_4n, n_levels=4, clusts=clusts)
 
-    np.savez_compressed('/scratch/eap40/training_data', a=train_accs_fix, b=test_accs_fix, c=trained_plist_fix,
-                        d=target_plist_fix)
+    # split input data into training, validation and test sets
+    L = inputs.shape[1]
+    train_split = 0.7
+    n_train = int(L * train_split)
+    train_inputs = inputs[:, :n_train]
+    val_split = 0.1
+    n_val = int(L * val_split)
+    val_inputs = inputs[:, n_train:n_train + n_val]
+    n_test = L - n_train - n_val
+    test_inputs = inputs[:, -n_test:]
 
+    # randomise parameters, and generate the target trace
+    target_model.randomise_parameters()
+    train_target = target_model(train_inputs)
+    val_target = target_model(val_inputs)
+    test_target = target_model(test_inputs)
 
-    "Training completed"
+    # start off with 1L model, and train until some performance on validation set
+    print("Beginning 1L training")
+    hln_1l = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
+    train_until(model=hln_1l, train_inputs=train_inputs, train_target=train_target,
+                                                val_inputs=val_inputs, val_target=val_target)
 
-    loss_value = loss(0, 1)
-    print(f"Loss value={loss_value}")
-    # # define hierarchical clustering of input ensembles
-    # clusts = [[[[[0, 1], [2]], [[3, 4], [5, 6]]], [[[7, 8], [9]], [[10, 11], [12]]]]]
-    #
-    # ### Define the different hLN architectures we will be using:
-    # # 1N
-    # Jc_1n = np.array([0])
-    # # 2N
-    # Jc_2n = np.array([0, 1, 1])
-    # # 3N
-    # Jc_3n = np.array([0, 1, 1, 2, 2, 3, 3])
-    # # 4N
-    # Jc_4n = np.array([0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7])
-    #
-    # # Get some realistic inputs
-    # X_tot = tf.convert_to_tensor(np.load('Data/real_inputs.npy'), dtype=tf.float32)  # real inputs made earlier
-    # X_e = X_tot[:629]  # 629 excitatory inputs, in 13 ensembles
-    # X_i = X_tot[629:]  # 120 inhibitory inputs, also in 13 ensembles
-    # # remember 1st inhibitory inputs is the somatic input - must always go to root subunit
-    # inputs = X_tot
-    #
-    #
-    # # Split the data into training and test sets, 80/20 initially
-    # split = 0.8
-    # L = inputs.shape[1]
-    # n_train = int(L * split)
-    # train_inputs = inputs[:, :n_train]
-    # test_inputs = inputs[:, n_train:]
-    #
-    # # create the Wcs based on the model and clusts
-    # Wce_1l, Wci_1l = create_weights(Jc_1l, n_levels=1, clusts=clusts)
-    # Wce_2n, Wci_2n = create_weights(Jc_2n, n_levels=2, clusts=clusts)
-    # Wce_3n, Wci_3n = create_weights(Jc_3n, n_levels=3, clusts=clusts)
-    # Wce_4n, Wci_4n = create_weights(Jc_4n, n_levels=4, clusts=clusts)
-    #
-    # # initialise a known version each of the models to generate data with: save the parameter somewhere
-    # hln_1l = hLN_Model(Jc=Jc_1n, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
-    # params_1l = [param.numpy() for param in hln_1l.params]
-    # np.save("Data/params_1l.npy", np.array(params_1l))
-    #
-    # # select the parameters of the model that generated the data
-    # target_params = params_1l
-    #
-    # # generate output data from realistic inputs
-    # target_1l = hln_1l(inputs)
-    # # target_1l = tf.convert_to_tensor(np.load('../Data/target.npy'), dtype=tf.float32)  # real output made earlier
-    # np.save("Data/target_1l.npy", target_1l.numpy())
-    #
-    # # split target into training and test data
-    # train_target = target_1l[:n_train]
-    # test_target = target_1l[n_train:]
-    #
-    #
-    # # randomise the parameters of hln_1l, start training
-    # hln_1l.randomise_parameters()
-    # # initialise 1L model, and optimise for data
-    # # define optimizer
-    # optimizer_1l = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=0.005)
-    # # train model with SGD
-    # loss_values_1l, accuracies_1l = train_lin_sgd(model=hln_1l, num_epochs=1000, optimizer=optimizer_1l,
-    #                                               inputs=train_inputs, target=train_target)
-    #
-    # # when to stop training? when performance on test data doesnt increase significantly each say 1000 epochs
-    #
-    # # visualise training graph and save without viewing, same for parameter graphs, also save stats
-    # # visualise results from 1L training
-    # plot_loss_acc(loss_values=loss_values_1l, accuracies=accuracies_1l, save=True, name="Figures/loss_acc_1l.png")
-    #
-    # plot_params(model=hln_1l, target_params=target_params)
+    # continue procedure with more complex models: 1N:
+    print("1L training finished, beginning 1N training")
+    hln_1n = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
+    init_nonlin(X=inputs, model=hln_1n, lin_model=hln_1l, nSD=50)
+    train_until(model=hln_1n, train_inputs=train_inputs, train_target=train_target,
+                                                val_inputs=val_inputs, val_target=val_target)
 
+    # continue procedure with more complex models: 2N:
+    print("1N training finished, beginning 2N training")
+    hln_2l = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, False, False]))
+    update_arch(prev_model=hln_1n, next_model=hln_2l)
+    hln_2n = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
+    init_nonlin(X=inputs, model=hln_2n, lin_model=hln_2l, nSD=50)
+    train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
+                                                val_inputs=val_inputs, val_target=val_target)
 
+    # continue procedure with more complex models: 3N:
+    print("2N training finished, beginning 3N training")
+    hln_3l = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
+                                                                             False, False, False, False]))
+    update_arch(prev_model=hln_2n, next_model=hln_3l)
+    hln_3n = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
+                                                                             True, True, True, True]))
+    init_nonlin(X=inputs, model=hln_3n, lin_model=hln_3l, nSD=50)
+    train_until(model=hln_3n, train_inputs=train_inputs, train_target=train_target,
+                                                val_inputs=val_inputs, val_target=val_target)
 
-    # initialise 1n model to approximate 1l model, train
+    # continue procedure with more complex models: 4N:
+    print("3N training finished, beginning 4N training")
+    hln_4l = hLN_Model(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n, sig_on=tf.constant([True, True, True, True, True, True, True,
+                                                                             False, False, False, False, False, False,
+                                                                             False, False]))
+    update_arch(prev_model=hln_3n, next_model=hln_4l)
+    hln_4n = hLN_Model(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n, sig_on=tf.constant([True, True, True, True, True, True, True,
+                                                                             True, True, True, True, True, True, True,
+                                                                             True]))
+    init_nonlin(X=inputs, model=hln_4n, lin_model=hln_4l, nSD=50)
+    train_until(model=hln_4n, train_inputs=train_inputs, train_target=train_target,
+                                                val_inputs=val_inputs, val_target=val_target)
 
-    # initialise 2n model to approximate 1n model, train
+    print("4N training finished, procedure ending")
 
-    # initialise 3n model to approximate 2n model, train
+    # return parameters of all trained models, and parameters of target model
+    params_1l = [param.numpy() for param in hln_1l.params]
+    params_1n = [param.numpy() for param in hln_1n.params]
+    params_2n = [param.numpy() for param in hln_2n.params]
+    params_3n = [param.numpy() for param in hln_3n.params]
+    params_4n = [param.numpy() for param in hln_4n.params]
 
-    # for continued training
+    target_params = [param.numpy() for param in target_model.params]
+
+    trained_param_list = [params_1l, params_1n, params_2n, params_3n, params_4n]
+
+    return target_params, trained_param_list
 
 
 def test_recovery(model, inputs, num_sims, n_attempts, num_epochs, learning_rate, enforce_params=False):
@@ -212,27 +232,6 @@ def test_recovery(model, inputs, num_sims, n_attempts, num_epochs, learning_rate
         trained_params_list.append(trained_params)
 
 
-        # # convert log parameters to normal for plotting
-        # log_params = [1, 4, 5, 7]
-        # for ind in log_params:
-        #     trained_params[ind] = np.exp(trained_params[ind])
-        #     target_params[ind] = np.exp(target_params[ind])
-        #
-        # # for single subunit linear model, only want these 4 parameters
-        # lin_indices = [0, 2, 4, 7]
-        # param_names = ["v0", "Wwe", "Taue", "Delay"]
-        #
-        # sim_stats=[]
-        # for i in range(len(param_names)):
-        #     p_trained, p_target = trained_params[lin_indices[i]].flatten(), target_params[lin_indices[i]].flatten()
-        #     if len(p_trained) > 1:
-        #         var_explained = 1 - ((p_trained - p_target) ** 2).mean() / np.var(p_target)
-        #         sim_stats.append(var_explained)
-        #     elif len(p_trained) == 1:
-        #         error = np.abs((p_trained[0] - p_target[0]) / p_target[0]) * 100
-        #         sim_stats.append(error)
-        #
-        # param_stats.append(sim_stats)
 
     return train_accuracies, test_accuracies, trained_params_list, target_params_list
 
