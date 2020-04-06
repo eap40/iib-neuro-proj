@@ -6,6 +6,7 @@ from sim_hLN import *
 from init_hLN import *
 from utils import *
 from tqdm import tqdm
+# from plot import *
 
 matplotlib.rcParams["legend.frameon"] = False
 
@@ -175,6 +176,43 @@ def train_sgd_decay(model, num_epochs, initial_rate, inputs, target, decay):
 
     return loss_values, accuracies
 
+
+def train_until(model, train_inputs, train_target, val_inputs, val_target):
+    """Function to perform SGD with Adam optimizer as previously, but this time train until condition instead of
+    for specified number of epochs. Every n_check epochs, check the performance on validation data. If condition
+    is satisfied, stop training"""
+
+    loss_values = []
+    accuracies = []
+    n_points = 1000
+    n_train = int(len(train_target.numpy()))
+    val_loss = 10  # initialise big so training does not stop straight away
+
+    optimizer_adam = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
+                                              epsilon=1e-07, amsgrad=False)
+
+    # set maximum training epochs at 10000 - stop before if condition satisfied
+    for epoch in tqdm(range(10000)):
+
+        #  check validation loss every 100 training epochs:
+        if epoch % 100 == 0:
+            #             print(f"Training epoch: {epoch}", end='\r')
+            next_val_loss = loss(model(val_inputs), val_target).numpy()
+            # if new loss is less than 0.01% bigger than last loss then stop training
+            if (val_loss - next_val_loss) / val_loss < 0.1 / 100:
+                break
+            else:
+                val_loss = next_val_loss
+
+        t_start = int(np.random.uniform(0, n_train - n_points))
+        loss_value, grads = grad_subset(model=model, inputs=train_inputs[:, t_start: t_start + n_points],
+                                        targets=train_target[t_start:t_start + n_points])
+        # accuracy = 100 * (1 - (loss_value / np.var(train_target[t_start:t_start + n_points])))
+        # loss_values.append(loss_value.numpy())
+        # accuracies.append(max(accuracy.numpy(), 0))
+        optimizer_adam.apply_gradients(zip(grads, model.trainable_params))
+
+    return
 
 # print(tf.autograph.to_code(sim_hLN_tf.python_function))
 
