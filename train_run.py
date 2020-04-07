@@ -43,7 +43,7 @@ def run():
     target_params, trained_param_list = validate_fit(target_model=hln_1n, num_sims=1, inputs=inputs)
 
     # save data
-    np.savez_compressed('/scratch/eap40/trained_models_1n', a=target_params, b=trained_param_list)
+    np.savez_compressed('/scratch/eap40/trained_models_1n', a=target_params, b=trained_param_list, c=inputs)
 
     print("Procedure finished")
 
