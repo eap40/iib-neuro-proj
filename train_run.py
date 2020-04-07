@@ -5,6 +5,20 @@ from gen_inputs import *
 def run():
     """Training procedure here"""
 
+
+    # try the following GPU code to fix problem with cudnn errors
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
+        try:
+            # Currently, memory growth needs to be the same across GPUs
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+        except RuntimeError as e:
+            # Memory growth must be set before GPUs have been initialized
+            print(e)
+
     # Lets generate some inputs this time
     E_spikes, I_spikes = gen_realistic_inputs(Tmax=3000)
     #
@@ -29,7 +43,7 @@ def run():
     target_params, trained_param_list = validate_fit(target_model=hln_1n, num_sims=1, inputs=inputs)
 
     # save data
-    np.savez_compressed('/scratch/eap40/training_data', a=target_params, b=trained_param_list)
+    np.savez_compressed('/scratch/eap40/trained_models_1n', a=target_params, b=trained_param_list)
 
     print("Procedure finished")
 
