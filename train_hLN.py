@@ -191,15 +191,15 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
     optimizer_adam = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
                                               epsilon=1e-07, amsgrad=False)
 
-    # set maximum training epochs at 10000 - stop before if condition satisfied
-    for epoch in tqdm(range(10000)):
+    # set maximum training epochs at 5000 - stop before if condition satisfied
+    for epoch in tqdm(range(5000)):
 
-        #  check validation loss every 100 training epochs:
-        if epoch % 100 == 0:
+        #  check validation loss every 1000 training epochs:
+        if epoch % 1000 == 0:
             #             print(f"Training epoch: {epoch}", end='\r')
             next_val_loss = loss(model(val_inputs), val_target).numpy()
-            # if new loss is less than 0.01% bigger than last loss then stop training
-            if (val_loss - next_val_loss) / val_loss < 0.1 / 100:
+            # if new loss is less than 5% bigger than last loss then stop training
+            if (val_loss - next_val_loss) / val_loss < 5 / 100:
                 break
             else:
                 val_loss = next_val_loss
