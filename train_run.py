@@ -49,7 +49,7 @@ def run():
     target_params_list, trained_params_list = validate_fit(target_model=hln_3n, num_sims=5, inputs=inputs)
 
     # save data
-    np.savez_compressed('/scratch/eap40/trained_models_3n', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/trained_models_3n2', a=target_params_list, b=trained_params_list, c=inputs)
 
     print("Procedure finished")
 
@@ -110,7 +110,7 @@ def validate_fit(target_model, num_sims, inputs):
         optimizer_1l = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
                                           epsilon=1e-07, amsgrad=False)
         # train model with SGD
-        loss_values_1l, accuracies_1l = train_sgd(model=hln_1l, num_epochs=5000, optimizer=optimizer_1l,
+        loss_values_1l, accuracies_1l = train_sgd(model=hln_1l, num_epochs=20000, optimizer=optimizer_1l,
                                             inputs=train_inputs, target=train_target)
 
 
