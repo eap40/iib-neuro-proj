@@ -35,15 +35,20 @@ def run():
     clusts = [[[[[0, 1], [2]], [[3, 4], [5, 6]]], [[[7, 8], [9]], [[10, 11], [12]]]]]
     Jc_1l = np.array([0])
     Jc_2n = np.array([0, 1, 1])
+    Jc_3n = np.array([0, 1, 1, 2, 2, 3, 3])
     Wce_1l, Wci_1l = create_weights(Jc_1l, n_levels=1, clusts=clusts)
     Wce_2n, Wci_2n = create_weights(Jc_2n, n_levels=2, clusts=clusts)
+    Wce_3n, Wci_3n = create_weights(Jc_3n, n_levels=3, clusts=clusts)
+    Wce_4n, Wci_4n = create_weights(Jc_4n, n_levels=4, clusts=clusts)
     hln_1l = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
+    hln_3n = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
+                                                                             True, True, True, True]))
 
     # validate_fit function
-    target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=5, inputs=inputs)
+    target_params_list, trained_params_list = validate_fit(target_model=hln_3n, num_sims=5, inputs=inputs)
 
     # save data
-    np.savez_compressed('/scratch/eap40/trained_models_1l_3', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/trained_models_3n', a=target_params_list, b=trained_params_list, c=inputs)
 
     print("Procedure finished")
 
