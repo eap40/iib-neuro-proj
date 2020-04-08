@@ -43,7 +43,7 @@ def run():
     target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=5, inputs=inputs)
 
     # save data
-    np.savez_compressed('/scratch/eap40/trained_models_1l_2', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/trained_models_1l_3', a=target_params_list, b=trained_params_list, c=inputs)
 
     print("Procedure finished")
 
@@ -99,15 +99,26 @@ def validate_fit(target_model, num_sims, inputs):
         # start off with 1L model, and train until some performance on validation set
         print("Beginning 1L training")
         hln_1l = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
-        train_until(model=hln_1l, train_inputs=train_inputs, train_target=train_target,
-                                                    val_inputs=val_inputs, val_target=val_target)
+        # train_until(model=hln_1l, train_inputs=train_inputs, train_target=train_target,
+        #                                             val_inputs=val_inputs, val_target=val_target)
+        optimizer_1l = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
+                                          epsilon=1e-07, amsgrad=False)
+        # train model with SGD
+        loss_values_1l, accuracies_1l = train_sgd(model=hln_1l, num_epochs=5000, optimizer=optimizer_1l,
+                                            inputs=train_inputs, target=train_target)
+
 
         # continue procedure with more complex models: 1N:
         print("1L training finished, beginning 1N training")
         hln_1n = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
         init_nonlin(X=inputs, model=hln_1n, lin_model=hln_1l, nSD=50)
-        train_until(model=hln_1n, train_inputs=train_inputs, train_target=train_target,
-                                                    val_inputs=val_inputs, val_target=val_target)
+        # train_until(model=hln_1n, train_inputs=train_inputs, train_target=train_target,
+        #                                             val_inputs=val_inputs, val_target=val_target)
+        optimizer_1n = tf.keras.optimizers.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999,
+                                                epsilon=1e-07, amsgrad=False)
+        loss_values_1n, accuracies_1n = train_sgd(model=hln_1n, num_epochs=1000, optimizer=optimizer_1n,
+                                                  inputs=train_inputs, target=train_target)
+
 
         # continue procedure with more complex models: 2N:
         print("1N training finished, beginning 2N training")
@@ -115,8 +126,12 @@ def validate_fit(target_model, num_sims, inputs):
         update_arch(prev_model=hln_1n, next_model=hln_2l)
         hln_2n = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
         init_nonlin(X=inputs, model=hln_2n, lin_model=hln_2l, nSD=50)
-        train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
-                                                    val_inputs=val_inputs, val_target=val_target)
+        # train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
+        #                                             val_inputs=val_inputs, val_target=val_target)
+        optimizer_2n = tf.keras.optimizers.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999,
+                                                epsilon=1e-07, amsgrad=False)
+        loss_values_2n, accuracies_2n = train_sgd(model=hln_2n, num_epochs=1000, optimizer=optimizer_2n,
+                                                  inputs=train_inputs, target=train_target)
 
         # continue procedure with more complex models: 3N:
         print("2N training finished, beginning 3N training")
@@ -126,8 +141,12 @@ def validate_fit(target_model, num_sims, inputs):
         hln_3n = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
                                                                                  True, True, True, True]))
         init_nonlin(X=inputs, model=hln_3n, lin_model=hln_3l, nSD=50)
-        train_until(model=hln_3n, train_inputs=train_inputs, train_target=train_target,
-                                                    val_inputs=val_inputs, val_target=val_target)
+        # train_until(model=hln_3n, train_inputs=train_inputs, train_target=train_target,
+        #                                             val_inputs=val_inputs, val_target=val_target)
+        optimizer_3n = tf.keras.optimizers.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999,
+                                                epsilon=1e-07, amsgrad=False)
+        loss_values_3n, accuracies_3n = train_sgd(model=hln_3n, num_epochs=1000, optimizer=optimizer_3n,
+                                                  inputs=train_inputs, target=train_target)
 
         # continue procedure with more complex models: 4N:
         print("3N training finished, beginning 4N training")
@@ -139,8 +158,12 @@ def validate_fit(target_model, num_sims, inputs):
                                                                                  True, True, True, True, True, True, True,
                                                                                  True]))
         init_nonlin(X=inputs, model=hln_4n, lin_model=hln_4l, nSD=50)
-        train_until(model=hln_4n, train_inputs=train_inputs, train_target=train_target,
-                                                    val_inputs=val_inputs, val_target=val_target)
+        # train_until(model=hln_4n, train_inputs=train_inputs, train_target=train_target,
+        #                                             val_inputs=val_inputs, val_target=val_target)
+        optimizer_4n = tf.keras.optimizers.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999,
+                                                epsilon=1e-07, amsgrad=False)
+        loss_values_4n, accuracies_4n = train_sgd(model=hln_4n, num_epochs=1000, optimizer=optimizer_4n,
+                                                  inputs=train_inputs, target=train_target)
 
         print("4N training finished, procedure ending")
 
