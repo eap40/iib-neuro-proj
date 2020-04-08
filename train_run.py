@@ -36,6 +36,7 @@ def run():
     Jc_1l = np.array([0])
     Jc_2n = np.array([0, 1, 1])
     Jc_3n = np.array([0, 1, 1, 2, 2, 3, 3])
+    Jc_4n = np.array([0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7])
     Wce_1l, Wci_1l = create_weights(Jc_1l, n_levels=1, clusts=clusts)
     Wce_2n, Wci_2n = create_weights(Jc_2n, n_levels=2, clusts=clusts)
     Wce_3n, Wci_3n = create_weights(Jc_3n, n_levels=3, clusts=clusts)
