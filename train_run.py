@@ -46,10 +46,10 @@ def run():
                                                                              True, True, True, True]))
 
     # validate_fit function
-    target_params_list, trained_params_list = validate_fit(target_model=hln_3n, num_sims=5, inputs=inputs)
+    target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=5, inputs=inputs)
 
     # save data
-    np.savez_compressed('/scratch/eap40/trained_models_3n2', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/trained_models_amsgrad_1l', a=target_params_list, b=trained_params_list, c=inputs)
 
     print("Procedure finished")
 
@@ -108,9 +108,9 @@ def validate_fit(target_model, num_sims, inputs):
         # train_until(model=hln_1l, train_inputs=train_inputs, train_target=train_target,
         #                                             val_inputs=val_inputs, val_target=val_target)
         optimizer_1l = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
-                                          epsilon=1e-07, amsgrad=False)
+                                          epsilon=1e-07, amsgrad=True)
         # train model with SGD
-        loss_values_1l, accuracies_1l = train_sgd(model=hln_1l, num_epochs=20000, optimizer=optimizer_1l,
+        loss_values_1l, accuracies_1l = train_sgd(model=hln_1l, num_epochs=5000, optimizer=optimizer_1l,
                                             inputs=train_inputs, target=train_target)
 
 
@@ -121,7 +121,7 @@ def validate_fit(target_model, num_sims, inputs):
         # train_until(model=hln_1n, train_inputs=train_inputs, train_target=train_target,
         #                                             val_inputs=val_inputs, val_target=val_target)
         optimizer_1n = tf.keras.optimizers.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999,
-                                                epsilon=1e-07, amsgrad=False)
+                                                epsilon=1e-07, amsgrad=True)
         loss_values_1n, accuracies_1n = train_sgd(model=hln_1n, num_epochs=1000, optimizer=optimizer_1n,
                                                   inputs=train_inputs, target=train_target)
 
@@ -135,7 +135,7 @@ def validate_fit(target_model, num_sims, inputs):
         # train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
         #                                             val_inputs=val_inputs, val_target=val_target)
         optimizer_2n = tf.keras.optimizers.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999,
-                                                epsilon=1e-07, amsgrad=False)
+                                                epsilon=1e-07, amsgrad=True)
         loss_values_2n, accuracies_2n = train_sgd(model=hln_2n, num_epochs=1000, optimizer=optimizer_2n,
                                                   inputs=train_inputs, target=train_target)
 
@@ -150,7 +150,7 @@ def validate_fit(target_model, num_sims, inputs):
         # train_until(model=hln_3n, train_inputs=train_inputs, train_target=train_target,
         #                                             val_inputs=val_inputs, val_target=val_target)
         optimizer_3n = tf.keras.optimizers.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999,
-                                                epsilon=1e-07, amsgrad=False)
+                                                epsilon=1e-07, amsgrad=True)
         loss_values_3n, accuracies_3n = train_sgd(model=hln_3n, num_epochs=1000, optimizer=optimizer_3n,
                                                   inputs=train_inputs, target=train_target)
 
@@ -167,7 +167,7 @@ def validate_fit(target_model, num_sims, inputs):
         # train_until(model=hln_4n, train_inputs=train_inputs, train_target=train_target,
         #                                             val_inputs=val_inputs, val_target=val_target)
         optimizer_4n = tf.keras.optimizers.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999,
-                                                epsilon=1e-07, amsgrad=False)
+                                                epsilon=1e-07, amsgrad=True)
         loss_values_4n, accuracies_4n = train_sgd(model=hln_4n, num_epochs=1000, optimizer=optimizer_4n,
                                                   inputs=train_inputs, target=train_target)
 
