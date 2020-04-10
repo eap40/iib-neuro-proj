@@ -50,10 +50,10 @@ def run():
     # target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=5, inputs=inputs)
 
     # training debug
-    target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_1l, inputs=inputs, nSD=4)
+    target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_1l, inputs=inputs, nSD=1)
 
     # save data
-    np.savez_compressed('/scratch/eap40/debug_1l2', a=target_params, b=trained_params, c=inputs, d=train_losses,
+    np.savez_compressed('/scratch/eap40/debug_1l3', a=target_params, b=trained_params, c=inputs, d=train_losses,
                         e=val_losses)
 
     print("Procedure finished")
