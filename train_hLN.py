@@ -182,27 +182,27 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
     for specified number of epochs. Every n_check epochs, check the performance on validation data. If condition
     is satisfied, stop training"""
 
-    loss_values = []
-    accuracies = []
+    train_losses = []
+    val_losses = []
     n_points = 1000
     n_train = int(len(train_target.numpy()))
-    val_loss = 10  # initialise big so training does not stop straight away
+    # val_loss = 10  # initialise big so training does not stop straight away
 
     optimizer_adam = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
-                                              epsilon=1e-07, amsgrad=False)
+                                              epsilon=1e-07, amsgrad=True)
 
     # set maximum training epochs at 5000 - stop before if condition satisfied
     for epoch in tqdm(range(5000)):
 
-        #  check validation loss every 1000 training epochs:
-        if epoch % 1000 == 0:
-            #             print(f"Training epoch: {epoch}", end='\r')
-            next_val_loss = loss(model(val_inputs), val_target).numpy()
-            # if new loss is less than 5% bigger than last loss then stop training
-            if (val_loss - next_val_loss) / val_loss < 5 / 100:
-                break
-            else:
-                val_loss = next_val_loss
+        # #  check validation loss every 1000 training epochs:
+        # if epoch % 1000 == 0:
+        #     #             print(f"Training epoch: {epoch}", end='\r')
+        #     next_val_loss = loss(model(val_inputs), val_target).numpy()
+        #     # if new loss is less than 5% bigger than last loss then stop training
+        #     if (val_loss - next_val_loss) / val_loss < 5 / 100:
+        #         break
+        #     else:
+        #         val_loss = next_val_loss
 
         t_start = int(np.random.uniform(0, n_train - n_points))
         loss_value, grads = grad_subset(model=model, inputs=train_inputs[:, t_start: t_start + n_points],
@@ -210,9 +210,13 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
         # accuracy = 100 * (1 - (loss_value / np.var(train_target[t_start:t_start + n_points])))
         # loss_values.append(loss_value.numpy())
         # accuracies.append(max(accuracy.numpy(), 0))
+        train_loss = loss(model(train_inputs), train_target)
+        val_loss = loss(model(val_inputs), val_target)
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
         optimizer_adam.apply_gradients(zip(grads, model.trainable_params))
 
-    return
+    return train_losses, val_losses
 
 # print(tf.autograph.to_code(sim_hLN_tf.python_function))
 
