@@ -46,10 +46,14 @@ def run():
                                                                              True, True, True, True]))
 
     # validate_fit function
-    target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=5, inputs=inputs)
+    # target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=5, inputs=inputs)
+
+    # training debug
+    target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_1l, inputs=inputs, nSD=40)
 
     # save data
-    np.savez_compressed('/scratch/eap40/trained_models_amsgrad_1l_long', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/debug_1l', a=target_params, b=trained_params, c=inputs, d=train_losses,
+                        e=val_losses)
 
     print("Procedure finished")
 
@@ -289,6 +293,124 @@ def test_recovery(model, inputs, num_sims, n_attempts, num_epochs, learning_rate
 
 
     return train_accuracies, test_accuracies, trained_params_list, target_params_list
+
+
+
+def debug_training(target_model, inputs, nSD):
+    """Function to perform similar process to validate fit, but returns loss values during training on the
+    train and validation set in order to investigate optimizer and hyperparameter investigation"""
+    ### Define the different hLN architectures we will be using:
+    # 1L
+    Jc_1l = np.array([0])
+    # 1N
+    Jc_1n = np.array([0])
+    # 2N
+    Jc_2n = np.array([0, 1, 1])
+    # 3N
+    Jc_3n = np.array([0, 1, 1, 2, 2, 3, 3])
+    # 4N
+    Jc_4n = np.array([0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7])
+
+    # list of lists for to define hierarchical clustering
+    clusts = [[[[[0, 1], [2]], [[3, 4], [5, 6]]], [[[7, 8], [9]], [[10, 11], [12]]]]]
+
+    Wce_1l, Wci_1l = create_weights(Jc_1l, n_levels=1, clusts=clusts)
+    Wce_2n, Wci_2n = create_weights(Jc_2n, n_levels=2, clusts=clusts)
+    Wce_3n, Wci_3n = create_weights(Jc_3n, n_levels=3, clusts=clusts)
+    Wce_4n, Wci_4n = create_weights(Jc_4n, n_levels=4, clusts=clusts)
+
+    # split input data into training, validation and test sets
+    L = inputs.shape[1]
+    train_split = 0.7
+    n_train = int(L * train_split)
+    train_inputs = inputs[:, :n_train]
+    val_split = 0.1
+    n_val = int(L * val_split)
+    val_inputs = inputs[:, n_train:n_train + n_val]
+    n_test = L - n_train - n_val
+    test_inputs = inputs[:, -n_test:]
+
+    target_params_list = []
+    trained_params_list = []
+
+    # randomise parameters, and generate the target trace
+    target_model.randomise_parameters()
+    train_target = target_model(train_inputs)
+    val_target = target_model(val_inputs)
+    test_target = target_model(test_inputs)
+
+    # start off with 1L model, and train until some performance on validation set
+    print("Beginning 1L training")
+    hln_1l = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
+    train_losses_1l, val_losses_1l = train_until(model=hln_1l, train_inputs=train_inputs, train_target=train_target,
+                                                val_inputs=val_inputs, val_target=val_target)
+
+
+
+    # continue procedure with more complex models: 1N:
+    print("1L training finished, beginning 1N training")
+    hln_1n = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
+    init_nonlin(X=inputs, model=hln_1n, lin_model=hln_1l, nSD=nSD)
+    train_losses_1n, val_losses_1n=train_until(model=hln_1n, train_inputs=train_inputs, train_target=train_target,
+                                                val_inputs=val_inputs, val_target=val_target)
+
+    # continue procedure with more complex models: 2N:
+    print("1N training finished, beginning 2N training")
+    hln_2l = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, False, False]))
+    update_arch(prev_model=hln_1n, next_model=hln_2l)
+    hln_2n = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
+    init_nonlin(X=inputs, model=hln_2n, lin_model=hln_2l, nSD=nSD)
+    train_losses_2n, val_losses_2n = train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
+                                                val_inputs=val_inputs, val_target=val_target)
+
+    # continue procedure with more complex models: 3N:
+    print("2N training finished, beginning 3N training")
+    hln_3l = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
+                                                                             False, False, False, False]))
+    update_arch(prev_model=hln_2n, next_model=hln_3l)
+    hln_3n = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
+                                                                             True, True, True, True]))
+    init_nonlin(X=inputs, model=hln_3n, lin_model=hln_3l, nSD=nSD)
+    train_losses_3n, val_losses_3n=train_until(model=hln_3n, train_inputs=train_inputs, train_target=train_target,
+                                                val_inputs=val_inputs, val_target=val_target)
+
+
+    # continue procedure with more complex models: 4N:
+    print("3N training finished, beginning 4N training")
+    hln_4l = hLN_Model(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n,
+                       sig_on=tf.constant([True, True, True, True, True, True, True,
+                                           False, False, False, False, False, False,
+                                           False, False]))
+    update_arch(prev_model=hln_3n, next_model=hln_4l)
+    hln_4n = hLN_Model(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n,
+                       sig_on=tf.constant([True, True, True, True, True, True, True,
+                                           True, True, True, True, True, True, True,
+                                           True]))
+    init_nonlin(X=inputs, model=hln_4n, lin_model=hln_4l, nSD=nSD)
+    train_losses_4n, val_losses_4n = train_until(model=hln_4n, train_inputs=train_inputs, train_target=train_target,
+                                                val_inputs=val_inputs, val_target=val_target)
+
+
+    print("4N training finished, procedure ending")
+
+    # return parameters of all trained models, and parameters of target model
+    params_1l = [param.numpy() for param in hln_1l.params]
+    params_1n = [param.numpy() for param in hln_1n.params]
+    params_2n = [param.numpy() for param in hln_2n.params]
+    params_3n = [param.numpy() for param in hln_3n.params]
+    params_4n = [param.numpy() for param in hln_4n.params]
+
+    target_params = [param.numpy() for param in target_model.params]
+
+    trained_params = [params_1l, params_1n, params_2n, params_3n, params_4n]
+
+    train_losses = [train_losses_1l, train_losses_1n, train_losses_2n,train_losses_3n, train_losses_4n]
+    val_losses = [val_losses_1l, val_losses_1n, val_losses_2n, val_losses_3n, val_losses_4n]
+
+    return target_params, trained_params, train_losses, val_losses
+
+
+
 
 if __name__ == '__main__':
     print('Beginning training procedure')
