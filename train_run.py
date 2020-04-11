@@ -43,6 +43,7 @@ def run():
     Wce_4n, Wci_4n = create_weights(Jc_4n, n_levels=4, clusts=clusts)
     hln_1l = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
     hln_1n = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
+    hln_2n = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
     hln_3n = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
                                                                              True, True, True, True]))
 
@@ -50,10 +51,10 @@ def run():
     # target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=5, inputs=inputs)
 
     # training debug
-    target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_1l, inputs=inputs, nSD=1)
+    target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_2n, inputs=inputs, nSD=1)
 
     # save data
-    np.savez_compressed('/scratch/eap40/debug_1l3', a=target_params, b=trained_params, c=inputs, d=train_losses,
+    np.savez_compressed('/scratch/eap40/debug_2n', a=target_params, b=trained_params, c=inputs, d=train_losses,
                         e=val_losses)
 
     print("Procedure finished")
