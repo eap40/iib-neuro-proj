@@ -48,14 +48,13 @@ def run():
                                                                              True, True, True, True]))
 
     # validate_fit function
-    # target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=5, inputs=inputs)
+    target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=5, inputs=inputs)
 
     # training debug
-    target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_1l, inputs=inputs, nSD=1)
+    # target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_1l, inputs=inputs, nSD=1)
 
     # save data
-    np.savez_compressed('/scratch/eap40/debug_tu_1l', a=target_params, b=trained_params, c=inputs, d=train_losses,
-                        e=val_losses)
+    np.savez_compressed('/scratch/eap40/val_nSDs_1l', a=target_params_list, b=trained_params_list, c=inputs)
 
     print("Procedure finished")
 
@@ -99,6 +98,10 @@ def validate_fit(target_model, num_sims, inputs):
     target_params_list = []
     trained_params_list = []
 
+    # define nSDs: when we step up a model, we'll initialise multiple models with different nSDs and then pick the
+    # one with lowest training error after training
+    nSDs = [1, 2, 4, 8]
+
     # repeat procedure multiple times
     for sim in range(num_sims):
 
@@ -111,25 +114,23 @@ def validate_fit(target_model, num_sims, inputs):
         # start off with 1L model, and train until some performance on validation set
         print("Beginning 1L training")
         hln_1l = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
-        # train_until(model=hln_1l, train_inputs=train_inputs, train_target=train_target,
-        #                                             val_inputs=val_inputs, val_target=val_target)
-        optimizer_1l = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
-                                          epsilon=1e-07, amsgrad=True)
-        # train model with SGD
-        loss_values_1l, accuracies_1l = train_sgd(model=hln_1l, num_epochs=5000, optimizer=optimizer_1l,
-                                            inputs=train_inputs, target=train_target)
+        train_until(model=hln_1l, train_inputs=train_inputs, train_target=train_target,
+                                                    val_inputs=val_inputs, val_target=val_target)
 
 
         # continue procedure with more complex models: 1N:
         print("1L training finished, beginning 1N training")
         hln_1n = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
-        init_nonlin(X=inputs, model=hln_1n, lin_model=hln_1l, nSD=50)
-        # train_until(model=hln_1n, train_inputs=train_inputs, train_target=train_target,
-        #                                             val_inputs=val_inputs, val_target=val_target)
-        optimizer_1n = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
-                                                epsilon=1e-07, amsgrad=True)
-        loss_values_1n, accuracies_1n = train_sgd(model=hln_1n, num_epochs=5000, optimizer=optimizer_1n,
-                                                  inputs=train_inputs, target=train_target)
+        best_loss_1n = 1000  # initialise best loss big - only save models if they beat the current best loss
+        best_params_1n = [param.numpy for param in hln_1n.params]
+        for nSD in nSDs:
+            init_nonlin(X=inputs, model=hln_1n, lin_model=hln_1l, nSD=nSD)
+            train_until(model=hln_1n, train_inputs=train_inputs, train_target=train_target,
+                                                        val_inputs=val_inputs, val_target=val_target)
+            final_loss = loss(hln_1n(train_inputs), train_target).numpy()
+            if final_loss < best_loss_1n:
+                final_loss = best_loss_1n
+                best_params_1n = [param.numpy for param in hln_1n.params]
 
 
         # continue procedure with more complex models: 2N:
@@ -137,13 +138,23 @@ def validate_fit(target_model, num_sims, inputs):
         hln_2l = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, False, False]))
         update_arch(prev_model=hln_1n, next_model=hln_2l)
         hln_2n = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
-        init_nonlin(X=inputs, model=hln_2n, lin_model=hln_2l, nSD=50)
+        best_loss_2n = 1000  # initialise best loss big - only save models if they beat the current best loss
+        best_params_2n = [param.numpy for param in hln_2n.params]
+        for nSD in nSDs:
+            init_nonlin(X=inputs, model=hln_2n, lin_model=hln_2l, nSD=nSD)
+            train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
+                        val_inputs=val_inputs, val_target=val_target)
+            final_loss = loss(hln_2n(train_inputs), train_target).numpy()
+            if final_loss < best_loss_2n:
+                final_loss = best_loss_2n
+                best_params_2n = [param.numpy for param in hln_2n.params]
+
         # train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
         #                                             val_inputs=val_inputs, val_target=val_target)
-        optimizer_2n = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
-                                                epsilon=1e-07, amsgrad=True)
-        loss_values_2n, accuracies_2n = train_sgd(model=hln_2n, num_epochs=5000, optimizer=optimizer_2n,
-                                                  inputs=train_inputs, target=train_target)
+        # optimizer_2n = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
+        #                                         epsilon=1e-07, amsgrad=True)
+        # loss_values_2n, accuracies_2n = train_sgd(model=hln_2n, num_epochs=5000, optimizer=optimizer_2n,
+        #                                           inputs=train_inputs, target=train_target)
 
         # continue procedure with more complex models: 3N:
         print("2N training finished, beginning 3N training")
@@ -152,13 +163,24 @@ def validate_fit(target_model, num_sims, inputs):
         update_arch(prev_model=hln_2n, next_model=hln_3l)
         hln_3n = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
                                                                                  True, True, True, True]))
-        init_nonlin(X=inputs, model=hln_3n, lin_model=hln_3l, nSD=50)
-        # train_until(model=hln_3n, train_inputs=train_inputs, train_target=train_target,
-        #                                             val_inputs=val_inputs, val_target=val_target)
-        optimizer_3n = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
-                                                epsilon=1e-07, amsgrad=True)
-        loss_values_3n, accuracies_3n = train_sgd(model=hln_3n, num_epochs=5000, optimizer=optimizer_3n,
-                                                  inputs=train_inputs, target=train_target)
+        best_loss_3n = 1000  # initialise best loss big - only save models if they beat the current best loss
+        best_params_3n = [param.numpy for param in hln_3n.params]
+        for nSD in nSDs:
+            init_nonlin(X=inputs, model=hln_3n, lin_model=hln_3l, nSD=nSD)
+            train_until(model=hln_3n, train_inputs=train_inputs, train_target=train_target,
+                        val_inputs=val_inputs, val_target=val_target)
+            final_loss = loss(hln_3n(train_inputs), train_target).numpy()
+            if final_loss < best_loss_3n:
+                final_loss = best_loss_3n
+                best_params_3n = [param.numpy for param in hln_3n.params]
+
+        # init_nonlin(X=inputs, model=hln_3n, lin_model=hln_3l, nSD=50)
+        # # train_until(model=hln_3n, train_inputs=train_inputs, train_target=train_target,
+        # #                                             val_inputs=val_inputs, val_target=val_target)
+        # # optimizer_3n = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
+        # #                                         epsilon=1e-07, amsgrad=True)
+        # loss_values_3n, accuracies_3n = train_sgd(model=hln_3n, num_epochs=5000, optimizer=optimizer_3n,
+        #                                           inputs=train_inputs, target=train_target)
 
         # continue procedure with more complex models: 4N:
         print("3N training finished, beginning 4N training")
@@ -169,26 +191,37 @@ def validate_fit(target_model, num_sims, inputs):
         hln_4n = hLN_Model(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n, sig_on=tf.constant([True, True, True, True, True, True, True,
                                                                                  True, True, True, True, True, True, True,
                                                                                  True]))
-        init_nonlin(X=inputs, model=hln_4n, lin_model=hln_4l, nSD=50)
-        # train_until(model=hln_4n, train_inputs=train_inputs, train_target=train_target,
-        #                                             val_inputs=val_inputs, val_target=val_target)
-        optimizer_4n = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
-                                                epsilon=1e-07, amsgrad=True)
-        loss_values_4n, accuracies_4n = train_sgd(model=hln_4n, num_epochs=5000, optimizer=optimizer_4n,
-                                                  inputs=train_inputs, target=train_target)
+        best_loss_4n = 1000  # initialise best loss big - only save models if they beat the current best loss
+        best_params_4n = [param.numpy for param in hln_4n.params]
+        for nSD in nSDs:
+            init_nonlin(X=inputs, model=hln_4n, lin_model=hln_4l, nSD=nSD)
+            train_until(model=hln_4n, train_inputs=train_inputs, train_target=train_target,
+                        val_inputs=val_inputs, val_target=val_target)
+            final_loss = loss(hln_4n(train_inputs), train_target).numpy()
+            if final_loss < best_loss_4n:
+                final_loss = best_loss_4n
+                best_params_4n = [param.numpy for param in hln_4n.params]
+
+        # init_nonlin(X=inputs, model=hln_4n, lin_model=hln_4l, nSD=50)
+        # # train_until(model=hln_4n, train_inputs=train_inputs, train_target=train_target,
+        # #                                             val_inputs=val_inputs, val_target=val_target)
+        # optimizer_4n = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
+        #                                         epsilon=1e-07, amsgrad=True)
+        # loss_values_4n, accuracies_4n = train_sgd(model=hln_4n, num_epochs=5000, optimizer=optimizer_4n,
+        #                                           inputs=train_inputs, target=train_target)
 
         print("4N training finished, procedure ending")
 
-        # return parameters of all trained models, and parameters of target model
+        # # return parameters of all trained models, and parameters of target model
         params_1l = [param.numpy() for param in hln_1l.params]
-        params_1n = [param.numpy() for param in hln_1n.params]
-        params_2n = [param.numpy() for param in hln_2n.params]
-        params_3n = [param.numpy() for param in hln_3n.params]
-        params_4n = [param.numpy() for param in hln_4n.params]
+        # params_1n = [param.numpy() for param in hln_1n.params]
+        # params_2n = [param.numpy() for param in hln_2n.params]
+        # params_3n = [param.numpy() for param in hln_3n.params]
+        # params_4n = [param.numpy() for param in hln_4n.params]
 
         target_params = [param.numpy() for param in target_model.params]
 
-        trained_params = [params_1l, params_1n, params_2n, params_3n, params_4n]
+        trained_params = [params_1l, best_params_1n, best_params_2n, best_params_3n, best_params_4n]
 
         # add recovered and target parameters to list we will later save
         target_params_list.append(target_params)
