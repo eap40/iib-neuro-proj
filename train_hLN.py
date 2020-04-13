@@ -200,14 +200,15 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
         # accuracy = 100 * (1 - (loss_value / np.var(train_target[t_start:t_start + n_points])))
         # loss_values.append(loss_value.numpy())
         # accuracies.append(max(accuracy.numpy(), 0))
-        train_loss = loss(model(train_inputs), train_target)
-        val_loss = loss(model(val_inputs), val_target)
-        train_losses.append(train_loss)
-        val_losses.append(val_loss)
+        # train_loss = loss(model(train_inputs), train_target)
+        # val_loss = loss(model(val_inputs), val_target)
+        # train_losses.append(train_loss)
+        # val_losses.append(val_loss)
 
         #  check validation loss every 1000 training epochs:
-        if epoch % 1000 == 0:
+        if epoch % 500 == 0:
             # if new loss is bigger than old loss, stop training - stochastic but polling every 1000 epochs should help
+            val_loss = loss(model(val_inputs), val_target)
             if (val_loss - last_val_loss) > 0:
                 break
             else:
