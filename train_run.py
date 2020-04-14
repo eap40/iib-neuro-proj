@@ -46,15 +46,22 @@ def run():
     hln_2n = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
     hln_3n = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
                                                                              True, True, True, True]))
+    hln_1l_tied = hLN_TiedModel(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
 
     # validate_fit function
-    target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=5, inputs=inputs)
+    # target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=5, inputs=inputs)
 
     # training debug
     # target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_1l, inputs=inputs, nSD=1)
 
+    # compare tied model routine
+    tied_train_accuracies, tied_test_accuracies, untied_train_accuracies, untied_test_accuracies = compare_tied(
+        target_model=hln_2n, untied_model=hln_1l, tied_model=hln_1l_tied, inputs=inputs, num_sims=5, n_attempts=1,
+                                                                                  num_epochs=5000, learning_rate=0.001)
+
     # save data
-    np.savez_compressed('/scratch/eap40/val_nSDs_1l2', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/comp_tied_2n', a=tied_train_accuracies, b=tied_test_accuracies,
+                        c=untied_train_accuracies, d=untied_test_accuracies)
 
     print("Procedure finished")
 
@@ -122,7 +129,7 @@ def validate_fit(target_model, num_sims, inputs):
         print("1L training finished, beginning 1N training")
         hln_1n = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
         best_loss_1n = 1000  # initialise best loss big - only save models if they beat the current best loss
-        best_params_1n = [param.numpy for param in hln_1n.params]
+        best_params_1n = [param.numpy() for param in hln_1n.params]
         for nSD in nSDs:
             init_nonlin(X=inputs, model=hln_1n, lin_model=hln_1l, nSD=nSD)
             train_until(model=hln_1n, train_inputs=train_inputs, train_target=train_target,
@@ -130,7 +137,7 @@ def validate_fit(target_model, num_sims, inputs):
             final_loss = loss(hln_1n(train_inputs), train_target).numpy()
             if final_loss < best_loss_1n:
                 final_loss = best_loss_1n
-                best_params_1n = [param.numpy for param in hln_1n.params]
+                best_params_1n = [param.numpy() for param in hln_1n.params]
 
 
         # continue procedure with more complex models: 2N:
@@ -139,7 +146,7 @@ def validate_fit(target_model, num_sims, inputs):
         update_arch(prev_model=hln_1n, next_model=hln_2l)
         hln_2n = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
         best_loss_2n = 1000  # initialise best loss big - only save models if they beat the current best loss
-        best_params_2n = [param.numpy for param in hln_2n.params]
+        best_params_2n = [param.numpy() for param in hln_2n.params]
         for nSD in nSDs:
             init_nonlin(X=inputs, model=hln_2n, lin_model=hln_2l, nSD=nSD)
             train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
@@ -147,7 +154,7 @@ def validate_fit(target_model, num_sims, inputs):
             final_loss = loss(hln_2n(train_inputs), train_target).numpy()
             if final_loss < best_loss_2n:
                 final_loss = best_loss_2n
-                best_params_2n = [param.numpy for param in hln_2n.params]
+                best_params_2n = [param.numpy() for param in hln_2n.params]
 
         # train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
         #                                             val_inputs=val_inputs, val_target=val_target)
@@ -164,7 +171,7 @@ def validate_fit(target_model, num_sims, inputs):
         hln_3n = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
                                                                                  True, True, True, True]))
         best_loss_3n = 1000  # initialise best loss big - only save models if they beat the current best loss
-        best_params_3n = [param.numpy for param in hln_3n.params]
+        best_params_3n = [param.numpy() for param in hln_3n.params]
         for nSD in nSDs:
             init_nonlin(X=inputs, model=hln_3n, lin_model=hln_3l, nSD=nSD)
             train_until(model=hln_3n, train_inputs=train_inputs, train_target=train_target,
@@ -172,7 +179,7 @@ def validate_fit(target_model, num_sims, inputs):
             final_loss = loss(hln_3n(train_inputs), train_target).numpy()
             if final_loss < best_loss_3n:
                 final_loss = best_loss_3n
-                best_params_3n = [param.numpy for param in hln_3n.params]
+                best_params_3n = [param.numpy() for param in hln_3n.params]
 
         # init_nonlin(X=inputs, model=hln_3n, lin_model=hln_3l, nSD=50)
         # # train_until(model=hln_3n, train_inputs=train_inputs, train_target=train_target,
@@ -192,7 +199,7 @@ def validate_fit(target_model, num_sims, inputs):
                                                                                  True, True, True, True, True, True, True,
                                                                                  True]))
         best_loss_4n = 1000  # initialise best loss big - only save models if they beat the current best loss
-        best_params_4n = [param.numpy for param in hln_4n.params]
+        best_params_4n = [param.numpy() for param in hln_4n.params]
         for nSD in nSDs:
             init_nonlin(X=inputs, model=hln_4n, lin_model=hln_4l, nSD=nSD)
             train_until(model=hln_4n, train_inputs=train_inputs, train_target=train_target,
@@ -200,7 +207,7 @@ def validate_fit(target_model, num_sims, inputs):
             final_loss = loss(hln_4n(train_inputs), train_target).numpy()
             if final_loss < best_loss_4n:
                 final_loss = best_loss_4n
-                best_params_4n = [param.numpy for param in hln_4n.params]
+                best_params_4n = [param.numpy() for param in hln_4n.params]
 
         # init_nonlin(X=inputs, model=hln_4n, lin_model=hln_4l, nSD=50)
         # # train_until(model=hln_4n, train_inputs=train_inputs, train_target=train_target,
@@ -329,6 +336,106 @@ def test_recovery(model, inputs, num_sims, n_attempts, num_epochs, learning_rate
 
     return train_accuracies, test_accuracies, trained_params_list, target_params_list
 
+
+def compare_tied(target_model, untied_model, tied_model, inputs, num_sims, n_attempts, num_epochs, learning_rate):
+    """Function to compare training procedures with and without tied models (where synapses share weights and time
+    constants"""
+
+
+    # First compare 1L tied and untied to a 1L target - does the tied model converge faster / get to a better final
+    # accuracy
+    # split input data into training and test sets, 80/20 initially
+    split = 0.8
+    L = inputs.shape[1]
+    n_train = int(L * split)
+    train_inputs = inputs[:, :n_train]
+    test_inputs = inputs[:, n_train:]
+
+    # create empty lists to store stats we want function to return
+    tied_train_accuracies = []
+    untied_train_accuracies = []
+    tied_test_accuracies = []
+    untied_test_accuracies = []
+    target_params_list = []
+    trained_params_list = []
+
+    # generate a number of different targets
+    for sim in range(num_sims):
+        # randomise the parameters before generating target
+        target_model.randomise_parameters()
+
+        # generate target with new parameters
+        train_target = target_model(train_inputs)
+
+        # store parameters of the target model, and split the target into training and test sets
+        test_target = target_model(test_inputs)
+        target_params = [param.numpy() for param in target_model.params]
+        target_params_list.append(target_params)
+
+        # for each simulation (i.e. each target generated), we have multiple training attempts with different initial
+        # conditions each time. We then take the model with the best training accuracy out of these attempts for
+        # investigation of parameter recovery
+
+        # for each attempt, we want to store the final training accuracy, test accuracy and final model parameters
+        tied_attempt_train_losses = [0]*n_attempts
+        tied_attempt_test_losses = [0]*n_attempts
+        untied_attempt_train_losses = [0] * n_attempts
+        untied_attempt_test_losses = [0] * n_attempts
+        # attempt_parameters = [0]*n_attempts
+
+        for attempt in range(n_attempts):
+
+            # Now try and train tied and untied models, first randomise them again:
+            untied_model.randomise_parameters()
+            tied_model.randomise_parameters()
+
+
+            # adam optimizer
+            untied_optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, beta_1=0.9, beta_2=0.999,
+                                                      epsilon=1e-07, amsgrad=False)
+            tied_optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, beta_1=0.9, beta_2=0.999,
+                                                        epsilon=1e-07, amsgrad=False)
+
+            # train tied model with SGD
+            loss_values, accuracies = train_sgd(model=tied_model, num_epochs=num_epochs, optimizer=tied_optimizer,
+                                                inputs=train_inputs, target=train_target)
+
+            # train untied model with SGD
+            loss_values, accuracies = train_sgd(model=untied_model, num_epochs=num_epochs, optimizer=untied_optimizer,
+                                                inputs=train_inputs, target=train_target)
+
+
+            # compute final test and training losses, and store for later
+            tied_test_loss = loss(predicted_v=tied_model(test_inputs), target_v=test_target)
+            untied_test_loss = loss(predicted_v=untied_model(test_inputs), target_v=test_target)
+            # test_accuracy = 100 * (1 - (test_loss / np.var(test_target)))
+            tied_train_loss = loss(predicted_v=tied_model(train_inputs), target_v=train_target)
+            untied_train_loss = loss(predicted_v=untied_model(train_inputs), target_v=train_target)
+            # train_accuracy = 100 * (1 - (train_loss / np.var(train_target)))
+            tied_attempt_test_losses[attempt] = tied_test_loss
+            untied_attempt_test_losses[attempt] = untied_test_loss
+            tied_attempt_train_losses[attempt] = tied_train_loss
+            untied_attempt_train_losses[attempt] = untied_train_loss
+
+            # # now store parameters
+            # trained_params = [param.numpy() for param in model.params]
+            # attempt_parameters[attempt] = trained_params
+
+        # now find attempt that produced minimum training loss, and use this for evaluation
+        tied_min_index = tied_attempt_train_losses.index(min(tied_attempt_train_losses))
+        untied_min_index = untied_attempt_train_losses.index(min(untied_attempt_train_losses))
+
+        tied_test_accuracies.append(get_accs(tied_attempt_test_losses[tied_min_index], test_target))
+        tied_train_accuracies.append(get_accs(tied_attempt_train_losses[tied_min_index], train_target))
+        untied_test_accuracies.append(get_accs(untied_attempt_test_losses[untied_min_index], test_target))
+        untied_train_accuracies.append(get_accs(untied_attempt_train_losses[untied_min_index], train_target))
+
+        # # save the final trained parameters
+        # trained_params_list.append(trained_params)
+
+
+
+    return tied_train_accuracies, tied_test_accuracies, untied_train_accuracies, untied_test_accuracies
 
 
 def debug_training(target_model, inputs, nSD):
