@@ -83,16 +83,76 @@ class hLN_Model(object):
 
         return
 
-    def tie_parameters(self):
-        # method to couple all synapses such that they share the same inhibitory population. Could be useful in
-        # initial training of 1L models to unknown trace
 
-        if not self.tied:
-            # set tied parameters to average value of untied:
-            Taue_av = tf.reduce_mean(tf.exp(self.logTaue))
-            Taui_av = tf.reduce_mean(tf.exp(self.logTaui))
-            Wwe_av = tf.reduce_mean(self.Wwe)
-            Wwi_av = tf.reduce_mean(self.Wwi)
+class hLN_TiedModel(object):
+
+    # hLN model with tied parameters - easier than adjusting current model to account for it
+    #
+    def __init__(self, Jc, Wce, Wci, sig_on):
+        # Initialize the parameters in some way
+        M = len(Jc)
+        self.n_e = np.concatenate(Wce).ravel().shape[0]
+        self.n_i = np.concatenate(Wci).ravel().shape[0]
+        self.Jc, self.Wce, self.Wci, self.sig_on = Jc, Wce, Wci, sig_on
+        self.Jw = tf.random.uniform(shape=[M], minval=1, maxval=1, dtype=tf.float32)
+        self.logJw = tf.Variable(tf.math.log(self.Jw))
+        self.Wwe = tf.Variable(tf.random.uniform(shape=(), minval=0.05, maxval=0.15, dtype=tf.float32))
+        self.Wwi = tf.Variable(tf.random.uniform(shape=(), minval=-0.15, maxval=-0.05, dtype=tf.float32))
+        self.Taue = tf.random.uniform(shape=(), minval=10, maxval=20, dtype=tf.float32)
+        self.logTaue = tf.Variable(tf.math.log(self.Taue))
+        self.Taui = tf.random.uniform(shape=(), minval=5, maxval=10, dtype=tf.float32)
+        self.logTaui = tf.Variable(tf.math.log(self.Taui))
+        # can initialise Th to anything as model is initially linear, and then Th will be initialised by another
+        # routine when it becomes nonlinear
+        self.Th = tf.Variable(tf.random.uniform(shape=[M], minval=-3, maxval=3, dtype=tf.float32))
+        self.Delay = tf.random.uniform(shape=[M], minval=0.1, maxval=5, dtype=tf.float32)
+        self.logDelay = tf.Variable(tf.math.log(self.Delay))
+        self.v0 = tf.Variable(tf.random.uniform(shape=(), minval=-0.1, maxval=0.1, dtype=tf.float32))
+        self.trainable_params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
+                                 self.Th, self.logDelay)
+
+        if M == 1 and not sig_on[0]:
+            # if single subunit linear model, take out parameters from trainable_params list
+            self.logJw.assign([0])
+            self.trainable_params = (self.v0, self.Wwe, self.Wwi, self.logTaue, self.logTaui, self.logDelay)
+
+    def __call__(self, x):
+
+        # feedforward model function - before carrying out, create vectors from the single weight and time
+        # constant values and assing to parameters
+
+        logTaues = tf.fill(dims=[self.n_e], value=self.logTaue)
+        logTauis = tf.fill(dims=[self.n_i], value=self.logTaui)
+        Wwes = tf.fill(dims=[self.n_e], value=self.Wwe)
+        Wwis = tf.fill(dims=[self.n_i], value=self.Wwi)
+        self.params = (self.v0, self.logJw, Wwes, Wwis, logTaues, logTauis,
+                       self.Th, self.logDelay)
+
+        return sim_hLN_tf2(X=x, dt=1, Jc=self.Jc, Wce=self.Wce, Wci=self.Wci, params=self.params, sig_on=self.sig_on)
+
+    def randomise_parameters(self):
+        M = len(self.Jc)
+        self.Jw = tf.random.uniform(shape=[M], minval=1, maxval=1, dtype=tf.float32)
+        self.logJw.assign(tf.math.log(self.Jw))
+        self.Wwe.assign(tf.random.uniform(shape=(), minval=0.05, maxval=0.15, dtype=tf.float32))
+        self.Wwi.assign(tf.random.uniform(shape=(), minval=-0.15, maxval=-0.05, dtype=tf.float32))
+        self.Taue = tf.random.uniform(shape=(), minval=10, maxval=20, dtype=tf.float32)
+        self.logTaue.assign(tf.math.log(self.Taue))
+        self.Taui = tf.random.uniform(shape=(), minval=5, maxval=10, dtype=tf.float32)
+        self.logTaui.assign(tf.math.log(self.Taui))
+        # can initialise Th to anything as model is initially linear, and then Th will be initialised by another
+        # routine when it becomes nonlinear
+        self.Th.assign(tf.random.uniform(shape=[M], minval=-3, maxval=3, dtype=tf.float32))
+        self.Delay = tf.random.uniform(shape=[M], minval=0.1, maxval=5, dtype=tf.float32)
+        self.logDelay.assign(tf.math.log(self.Delay))
+        self.v0.assign(tf.random.uniform(shape=(), minval=-0.1, maxval=0.1, dtype=tf.float32))
+        self.trainable_params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
+                                 self.Th, self.logDelay)
+
+        if M == 1 and not self.sig_on[0]:
+            # if single subunit linear model, take out parameters from trainable_params list
+            self.logJw.assign([0])
+            self.trainable_params = (self.v0, self.Wwe, self.Wwi, self.logTaue, self.logTaui, self.logDelay)
 
         return
 
