@@ -54,7 +54,7 @@ def run():
     # target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_1l, inputs=inputs, nSD=1)
 
     # save data
-    np.savez_compressed('/scratch/eap40/val_nSDs_1l', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/val_nSDs_1l2', a=target_params_list, b=trained_params_list, c=inputs)
 
     print("Procedure finished")
 
