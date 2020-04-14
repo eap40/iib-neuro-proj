@@ -234,3 +234,10 @@ def create_weights(Jc, n_levels, clusts):
     return Wce, Wci
 
 
+def get_accs(losses, target_variance):
+    """function to get accuracy from an array of losses, using the variance of the target trace"""
+
+    accs = 100 * (1 - losses/target_variance)
+
+    return accs
+
