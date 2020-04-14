@@ -47,6 +47,9 @@ class hLN_Model(object):
             self.logJw.assign([0])
             self.trainable_params = (self.v0, self.Wwe, self.Wwi, self.logTaue, self.logTaui, self.logDelay)
 
+        # initialise model in untied state - synapses have different weights and time constants
+        self.tied = False
+
 
 
     def __call__(self, x):
@@ -77,6 +80,19 @@ class hLN_Model(object):
             # if single subunit linear model, take out parameters from trainable_params list
             self.logJw.assign([0])
             self.trainable_params = (self.v0, self.Wwe, self.Wwi, self.logTaue, self.logTaui, self.logDelay)
+
+        return
+
+    def tie_parameters(self):
+        # method to couple all synapses such that they share the same inhibitory population. Could be useful in
+        # initial training of 1L models to unknown trace
+
+        if not self.tied:
+            # set tied parameters to average value of untied:
+            Taue_av = tf.reduce_mean(tf.exp(self.logTaue))
+            Taui_av = tf.reduce_mean(tf.exp(self.logTaui))
+            Wwe_av = tf.reduce_mean(self.Wwe)
+            Wwi_av = tf.reduce_mean(self.Wwi)
 
         return
 
@@ -206,15 +222,15 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
         # val_losses.append(val_loss)
 
         #  check validation loss every 1000 training epochs:
-        if epoch % 500 == 0:
-            # if new loss is bigger than old loss, stop training - stochastic but polling every 1000 epochs should help
-            val_loss = loss(model(val_inputs), val_target)
-            if (val_loss - last_val_loss) > 0:
-                break
-            else:
-                last_val_loss = val_loss
+        # if epoch % 500 == 0:
+        #     # if new loss is bigger than old loss, stop training - stochastic but polling every 1000 epochs should help
+        #     val_loss = loss(model(val_inputs), val_target)
+        #     if (val_loss - last_val_loss) > 0:
+        #         break
+        #     else:
+        #         last_val_loss = val_loss
 
         optimizer_adam.apply_gradients(zip(grads, model.trainable_params))
 
-    return train_losses, val_losses
+    return
 
