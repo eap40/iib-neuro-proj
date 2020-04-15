@@ -49,19 +49,19 @@ def run():
     hln_1l_tied = hLN_TiedModel(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
 
     # validate_fit function
-    target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=1, inputs=inputs)
+    # target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=1, inputs=inputs)
 
     # training debug
     # target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_1l, inputs=inputs, nSD=1)
 
     # compare tied model routine
-    # tied_train_accuracies, tied_test_accuracies, untied_train_accuracies, untied_test_accuracies = compare_tied(
-    #     target_model=hln_2n, untied_model=hln_1l, tied_model=hln_1l_tied, inputs=inputs, num_sims=5, n_attempts=1,
-    #                                                                               num_epochs=5000, learning_rate=0.001)
+    tied_train_accuracies, tied_test_accuracies, untied_train_accuracies, untied_test_accuracies = compare_tied(
+        target_model=hln_2n, untied_model=hln_1l, tied_model=hln_1l_tied, inputs=inputs, num_sims=5, n_attempts=5,
+                                                                                  num_epochs=5000, learning_rate=0.001)
 
     # save data
-    np.savez_compressed('/scratch/eap40/val_nSDs_1l2', a=target_params_list, b=trained_params_list,
-                        c=inputs)
+    np.savez_compressed('/scratch/eap40/comp_tied_2n2', a=tied_train_accuracies, b=tied_test_accuracies,
+                        c=untied_train_accuracies, d=untied_test_accuracies)
 
     print("Procedure finished")
 
