@@ -201,7 +201,7 @@ def init_nonlin_tied(X, model, lin_model, nSD, dt=1):
     Wwis = []
     for m in range(len(model.Jc)):
         logTaues = tf.concat((logTaues, tf.fill(dims=[len(model.Wce[m])], value=model.logTaue[m])), axis=0)
-        logTauis = tf.concat((logTaues, tf.fill(dims=[len(model.Wci[m])], value=model.logTaui[m])), axis=0)
+        logTauis = tf.concat((logTauis, tf.fill(dims=[len(model.Wci[m])], value=model.logTaui[m])), axis=0)
         Wwes = tf.concat((Wwes, tf.fill(dims=[len(model.Wce[m])], value=model.Wwe[m])), axis=0)
         Wwis = tf.concat((Wwis, tf.fill(dims=[len(model.Wci[m])], value=model.Wwi[m])), axis=0)
 

@@ -131,7 +131,7 @@ class hLN_TiedModel(object):
         Wwis = []
         for m in range(len(self.Jc)):
             logTaues = tf.concat((logTaues, tf.fill(dims=[len(self.Wce[m])], value=self.logTaue[m])), axis=0)
-            logTauis = tf.concat((logTaues, tf.fill(dims=[len(self.Wci[m])], value=self.logTaui[m])), axis=0)
+            logTauis = tf.concat((logTauis, tf.fill(dims=[len(self.Wci[m])], value=self.logTaui[m])), axis=0)
             Wwes = tf.concat((Wwes, tf.fill(dims=[len(self.Wce[m])], value=self.Wwe[m])), axis=0)
             Wwis = tf.concat((Wwis, tf.fill(dims=[len(self.Wci[m])], value=self.Wwi[m])), axis=0)
 
