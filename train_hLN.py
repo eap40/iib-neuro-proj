@@ -280,8 +280,8 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
     optimizer_adam = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
                                               epsilon=1e-07, amsgrad=True)
 
-    # set maximum training epochs at 5000 - stop before if condition satisfied
-    for epoch in tqdm(range(5000)):
+    # set maximum training epochs at 10000 - stop before if condition satisfied
+    for epoch in tqdm(range(10000)):
 
         t_start = int(np.random.uniform(0, n_train - n_points))
         loss_value, grads = grad_subset(model=model, inputs=train_inputs[:, t_start: t_start + n_points],
@@ -289,21 +289,21 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
         # accuracy = 100 * (1 - (loss_value / np.var(train_target[t_start:t_start + n_points])))
         # loss_values.append(loss_value.numpy())
         # accuracies.append(max(accuracy.numpy(), 0))
-        train_loss = loss(model(train_inputs), train_target)
-        val_loss = loss(model(val_inputs), val_target)
-        train_losses.append(train_loss)
-        val_losses.append(val_loss)
+        # train_loss = loss(model(train_inputs), train_target)
+        # val_loss = loss(model(val_inputs), val_target)
+        # train_losses.append(train_loss)
+        # val_losses.append(val_loss)
 
          # check validation loss every 1000 training epochs:
-        # if epoch % 1000 == 0:
-        #     # if new loss is bigger than old loss, stop training - stochastic but polling every 1000 epochs should help
-        #     val_loss = loss(model(val_inputs), val_target)
-        #     if (val_loss - last_val_loss) > 0:
-        #         break
-        #     else:
-        #         last_val_loss = val_loss
+        if epoch % 1000 == 0:
+            # if new loss is bigger than old loss, stop training - stochastic but polling every 1000 epochs should help
+            val_loss = loss(model(val_inputs), val_target)
+            if (val_loss - last_val_loss) > 0:
+                break
+            else:
+                last_val_loss = val_loss
 
         optimizer_adam.apply_gradients(zip(grads, model.trainable_params))
 
-    return train_losses, val_losses
+    return
 
