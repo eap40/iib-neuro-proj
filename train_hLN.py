@@ -86,8 +86,8 @@ class hLN_Model(object):
 
 class hLN_TiedModel(object):
 
-    # hLN model with tied parameters - easier than adjusting current model to account for it
-    #
+    # hLN model with tied parameters - easier than adjusting current model to account for it. Probably want 2 options:
+    # tie all synapses to have the same parameters, or one set of parameters for each subunit
     def __init__(self, Jc, Wce, Wci, sig_on):
         # Initialize the parameters in some way
         M = len(Jc)
@@ -96,11 +96,11 @@ class hLN_TiedModel(object):
         self.Jc, self.Wce, self.Wci, self.sig_on = Jc, Wce, Wci, sig_on
         self.Jw = tf.random.uniform(shape=[M], minval=1, maxval=1, dtype=tf.float32)
         self.logJw = tf.Variable(tf.math.log(self.Jw))
-        self.Wwe = tf.Variable(tf.random.uniform(shape=(), minval=0.05, maxval=0.15, dtype=tf.float32))
-        self.Wwi = tf.Variable(tf.random.uniform(shape=(), minval=-0.15, maxval=-0.05, dtype=tf.float32))
-        self.Taue = tf.random.uniform(shape=(), minval=10, maxval=20, dtype=tf.float32)
+        self.Wwe = tf.Variable(tf.random.uniform(shape=[M], minval=0.05, maxval=0.15, dtype=tf.float32))
+        self.Wwi = tf.Variable(tf.random.uniform(shape=[M], minval=-0.15, maxval=-0.05, dtype=tf.float32))
+        self.Taue = tf.random.uniform(shape=[M], minval=10, maxval=20, dtype=tf.float32)
         self.logTaue = tf.Variable(tf.math.log(self.Taue))
-        self.Taui = tf.random.uniform(shape=(), minval=5, maxval=10, dtype=tf.float32)
+        self.Taui = tf.random.uniform(shape=[M], minval=5, maxval=10, dtype=tf.float32)
         self.logTaui = tf.Variable(tf.math.log(self.Taui))
         # can initialise Th to anything as model is initially linear, and then Th will be initialised by another
         # routine when it becomes nonlinear
@@ -110,6 +110,8 @@ class hLN_TiedModel(object):
         self.v0 = tf.Variable(tf.random.uniform(shape=(), minval=-0.1, maxval=0.1, dtype=tf.float32))
         self.trainable_params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
                                  self.Th, self.logDelay)
+        self.params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
+                       self.Th, self.logDelay)
 
         if M == 1 and not sig_on[0]:
             # if single subunit linear model, take out parameters from trainable_params list
@@ -121,12 +123,22 @@ class hLN_TiedModel(object):
         # feedforward model function - before carrying out, create vectors from the single weight and time
         # constant values and assing to parameters
 
-        logTaues = tf.fill(dims=[self.n_e], value=self.logTaue)
-        logTauis = tf.fill(dims=[self.n_i], value=self.logTaui)
-        Wwes = tf.fill(dims=[self.n_e], value=self.Wwe)
-        Wwis = tf.fill(dims=[self.n_i], value=self.Wwi)
+        # will concatenate vectors together to form parameter vectors from the tied synaptic weights and time
+        # constants, so intialise empty first
+        logTaues = []
+        logTauis = []
+        Wwes = []
+        Wwis = []
+        for m in range(len(self.Jc)):
+            logTaues = tf.concat((logTaues, tf.fill(dims=[len(self.Wce[m])], value=self.logTaue[m])), axis=0)
+            logTauis = tf.concat((logTaues, tf.fill(dims=[len(self.Wci[m])], value=self.logTaui[m])), axis=0)
+            Wwes = tf.concat((Wwes, tf.fill(dims=[len(self.Wce[m])], value=self.Wwe[m])), axis=0)
+            Wwis = tf.concat((Wwis, tf.fill(dims=[len(self.Wci[m])], value=self.Wwi[m])), axis=0)
+
         self.params = (self.v0, self.logJw, Wwes, Wwis, logTaues, logTauis,
                        self.Th, self.logDelay)
+
+        # now option with different parameters on each subunit
 
         return sim_hLN_tf2(X=x, dt=1, Jc=self.Jc, Wce=self.Wce, Wci=self.Wci, params=self.params, sig_on=self.sig_on)
 
@@ -134,11 +146,11 @@ class hLN_TiedModel(object):
         M = len(self.Jc)
         self.Jw = tf.random.uniform(shape=[M], minval=1, maxval=1, dtype=tf.float32)
         self.logJw.assign(tf.math.log(self.Jw))
-        self.Wwe.assign(tf.random.uniform(shape=(), minval=0.05, maxval=0.15, dtype=tf.float32))
-        self.Wwi.assign(tf.random.uniform(shape=(), minval=-0.15, maxval=-0.05, dtype=tf.float32))
-        self.Taue = tf.random.uniform(shape=(), minval=10, maxval=20, dtype=tf.float32)
+        self.Wwe.assign(tf.random.uniform(shape=[M], minval=0.05, maxval=0.15, dtype=tf.float32))
+        self.Wwi.assign(tf.random.uniform(shape=[M], minval=-0.15, maxval=-0.05, dtype=tf.float32))
+        self.Taue = tf.random.uniform(shape=[M], minval=10, maxval=20, dtype=tf.float32)
         self.logTaue.assign(tf.math.log(self.Taue))
-        self.Taui = tf.random.uniform(shape=(), minval=5, maxval=10, dtype=tf.float32)
+        self.Taui = tf.random.uniform(shape=[M], minval=5, maxval=10, dtype=tf.float32)
         self.logTaui.assign(tf.math.log(self.Taui))
         # can initialise Th to anything as model is initially linear, and then Th will be initialised by another
         # routine when it becomes nonlinear
@@ -148,6 +160,8 @@ class hLN_TiedModel(object):
         self.v0.assign(tf.random.uniform(shape=(), minval=-0.1, maxval=0.1, dtype=tf.float32))
         self.trainable_params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
                                  self.Th, self.logDelay)
+        self.params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
+                       self.Th, self.logDelay)
 
         if M == 1 and not self.sig_on[0]:
             # if single subunit linear model, take out parameters from trainable_params list
@@ -155,7 +169,6 @@ class hLN_TiedModel(object):
             self.trainable_params = (self.v0, self.Wwe, self.Wwi, self.logTaue, self.logTaui, self.logDelay)
 
         return
-
 
 
 # define loss and gradient function
@@ -281,14 +294,14 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
         # train_losses.append(train_loss)
         # val_losses.append(val_loss)
 
-        #  check validation loss every 1000 training epochs:
-        # if epoch % 500 == 0:
-        #     # if new loss is bigger than old loss, stop training - stochastic but polling every 1000 epochs should help
-        #     val_loss = loss(model(val_inputs), val_target)
-        #     if (val_loss - last_val_loss) > 0:
-        #         break
-        #     else:
-        #         last_val_loss = val_loss
+         # check validation loss every 1000 training epochs:
+        if epoch % 1000 == 0:
+            # if new loss is bigger than old loss, stop training - stochastic but polling every 1000 epochs should help
+            val_loss = loss(model(val_inputs), val_target)
+            if (val_loss - last_val_loss) > 0:
+                break
+            else:
+                last_val_loss = val_loss
 
         optimizer_adam.apply_gradients(zip(grads, model.trainable_params))
 
