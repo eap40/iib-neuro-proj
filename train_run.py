@@ -52,16 +52,16 @@ def run():
     # target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=1, inputs=inputs)
 
     # training debug
-    # target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_1l, inputs=inputs, nSD=1)
+    target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_1l, inputs=inputs, nSD=1)
 
     # compare tied model routine
-    tied_train_accuracies, tied_test_accuracies, untied_train_accuracies, untied_test_accuracies = compare_tied(
-        target_model=hln_2n, untied_model=hln_1l, tied_model=hln_1l_tied, inputs=inputs, num_sims=5, n_attempts=5,
-                                                                                  num_epochs=5000, learning_rate=0.001)
+    # tied_train_accuracies, tied_test_accuracies, untied_train_accuracies, untied_test_accuracies = compare_tied(
+    #     target_model=hln_2n, untied_model=hln_1l, tied_model=hln_1l_tied, inputs=inputs, num_sims=5, n_attempts=5,
+    #                                                                               num_epochs=5000, learning_rate=0.001)
 
     # save data
-    np.savez_compressed('/scratch/eap40/comp_tied_2n2', a=tied_train_accuracies, b=tied_test_accuracies,
-                        c=untied_train_accuracies, d=untied_test_accuracies)
+    np.savez_compressed('/scratch/eap40/debug_tied_1l', a=target_params, b=trained_params, c=inputs,
+                        d=train_losses, e=val_losses)
 
     print("Procedure finished")
 
@@ -483,7 +483,7 @@ def debug_training(target_model, inputs, nSD):
 
     # start off with 1L model, and train until some performance on validation set
     print("Beginning 1L training")
-    hln_1l = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
+    hln_1l = hLN_TiedModel(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
     train_losses_1l, val_losses_1l = train_until(model=hln_1l, train_inputs=train_inputs, train_target=train_target,
                                                 val_inputs=val_inputs, val_target=val_target)
 
@@ -491,44 +491,44 @@ def debug_training(target_model, inputs, nSD):
 
     # continue procedure with more complex models: 1N:
     print("1L training finished, beginning 1N training")
-    hln_1n = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
-    init_nonlin(X=inputs, model=hln_1n, lin_model=hln_1l, nSD=nSD)
+    hln_1n = hLN_Tiedodel(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
+    init_nonlin_tied(X=inputs, model=hln_1n, lin_model=hln_1l, nSD=nSD)
     train_losses_1n, val_losses_1n=train_until(model=hln_1n, train_inputs=train_inputs, train_target=train_target,
                                                 val_inputs=val_inputs, val_target=val_target)
 
     # continue procedure with more complex models: 2N:
     print("1N training finished, beginning 2N training")
-    hln_2l = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, False, False]))
-    update_arch(prev_model=hln_1n, next_model=hln_2l)
-    hln_2n = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
-    init_nonlin(X=inputs, model=hln_2n, lin_model=hln_2l, nSD=nSD)
+    hln_2l = hLN_TiedModel(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, False, False]))
+    update_arch_tied(prev_model=hln_1n, next_model=hln_2l)
+    hln_2n = hLN_TiedModel(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
+    init_nonlin_tied(X=inputs, model=hln_2n, lin_model=hln_2l, nSD=nSD)
     train_losses_2n, val_losses_2n = train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
                                                 val_inputs=val_inputs, val_target=val_target)
 
     # continue procedure with more complex models: 3N:
     print("2N training finished, beginning 3N training")
-    hln_3l = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
+    hln_3l = hLN_TiedModel(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
                                                                              False, False, False, False]))
-    update_arch(prev_model=hln_2n, next_model=hln_3l)
-    hln_3n = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
+    update_arch_tied(prev_model=hln_2n, next_model=hln_3l)
+    hln_3n = hLN_TiedModel(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
                                                                              True, True, True, True]))
-    init_nonlin(X=inputs, model=hln_3n, lin_model=hln_3l, nSD=nSD)
+    init_nonlin_tied(X=inputs, model=hln_3n, lin_model=hln_3l, nSD=nSD)
     train_losses_3n, val_losses_3n=train_until(model=hln_3n, train_inputs=train_inputs, train_target=train_target,
                                                 val_inputs=val_inputs, val_target=val_target)
 
 
     # continue procedure with more complex models: 4N:
     print("3N training finished, beginning 4N training")
-    hln_4l = hLN_Model(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n,
+    hln_4l = hLN_TiedModel(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n,
                        sig_on=tf.constant([True, True, True, True, True, True, True,
                                            False, False, False, False, False, False,
                                            False, False]))
-    update_arch(prev_model=hln_3n, next_model=hln_4l)
-    hln_4n = hLN_Model(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n,
+    update_arch_tied(prev_model=hln_3n, next_model=hln_4l)
+    hln_4n = hLN_TiedModel(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n,
                        sig_on=tf.constant([True, True, True, True, True, True, True,
                                            True, True, True, True, True, True, True,
                                            True]))
-    init_nonlin(X=inputs, model=hln_4n, lin_model=hln_4l, nSD=nSD)
+    init_nonlin_tied(X=inputs, model=hln_4n, lin_model=hln_4l, nSD=nSD)
     train_losses_4n, val_losses_4n = train_until(model=hln_4n, train_inputs=train_inputs, train_target=train_target,
                                                 val_inputs=val_inputs, val_target=val_target)
 
