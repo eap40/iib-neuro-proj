@@ -491,7 +491,7 @@ def debug_training(target_model, inputs, nSD):
 
     # continue procedure with more complex models: 1N:
     print("1L training finished, beginning 1N training")
-    hln_1n = hLN_Tiedodel(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
+    hln_1n = hLN_TiedModel(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
     init_nonlin_tied(X=inputs, model=hln_1n, lin_model=hln_1l, nSD=nSD)
     train_losses_1n, val_losses_1n=train_until(model=hln_1n, train_inputs=train_inputs, train_target=train_target,
                                                 val_inputs=val_inputs, val_target=val_target)
