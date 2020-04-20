@@ -49,10 +49,10 @@ def run():
     hln_1l_tied = hLN_TiedModel(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
 
     # validate_fit function
-    # target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=1, inputs=inputs)
+    target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=5, inputs=inputs)
 
     # training debug
-    target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_1l, inputs=inputs, nSD=1)
+    # target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_1l, inputs=inputs, nSD=1)
 
     # compare tied model routine
     # tied_train_accuracies, tied_test_accuracies, untied_train_accuracies, untied_test_accuracies = compare_tied(
@@ -60,8 +60,7 @@ def run():
     #                                                                               num_epochs=5000, learning_rate=0.001)
 
     # save data
-    np.savez_compressed('/scratch/eap40/debug_tied_1l', a=target_params, b=trained_params, c=inputs,
-                        d=train_losses, e=val_losses)
+    np.savez_compressed('/scratch/eap40/val_tied_1l', a=target_params_list, b=trained_params_list, c=inputs)
 
     print("Procedure finished")
 
@@ -107,7 +106,7 @@ def validate_fit(target_model, num_sims, inputs):
 
     # define nSDs: when we step up a model, we'll initialise multiple models with different nSDs and then pick the
     # one with lowest training error after training
-    nSDs = [1, 2, 4, 8]
+    nSDs = [1, 2, 4]
 
     # repeat procedure multiple times
     for sim in range(num_sims):
@@ -120,40 +119,40 @@ def validate_fit(target_model, num_sims, inputs):
 
         # start off with 1L model, and train until some performance on validation set
         print("Beginning 1L training")
-        hln_1l = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
+        hln_1l = hLN_TiedModel(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
         train_until(model=hln_1l, train_inputs=train_inputs, train_target=train_target,
                                                     val_inputs=val_inputs, val_target=val_target)
 
 
         # continue procedure with more complex models: 1N:
         print("1L training finished, beginning 1N training")
-        hln_1n = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
+        hln_1n = hLN_TiedModel(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
         best_loss_1n = 1000  # initialise best loss big - only save models if they beat the current best loss
         best_params_1n = [param.numpy() for param in hln_1n.params]
         for nSD in nSDs:
-            init_nonlin(X=inputs, model=hln_1n, lin_model=hln_1l, nSD=nSD)
+            init_nonlin_tied(X=inputs, model=hln_1n, lin_model=hln_1l, nSD=nSD)
             train_until(model=hln_1n, train_inputs=train_inputs, train_target=train_target,
                                                         val_inputs=val_inputs, val_target=val_target)
             final_loss = loss(hln_1n(train_inputs), train_target).numpy()
             if final_loss < best_loss_1n:
-                final_loss = best_loss_1n
+                best_loss_1n = final_loss
                 best_params_1n = [param.numpy() for param in hln_1n.params]
 
 
         # continue procedure with more complex models: 2N:
         print("1N training finished, beginning 2N training")
-        hln_2l = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, False, False]))
-        update_arch(prev_model=hln_1n, next_model=hln_2l)
-        hln_2n = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
+        hln_2l = hLN_TiedModel(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, False, False]))
+        update_arch_tied(prev_model=hln_1n, next_model=hln_2l)
+        hln_2n = hLN_TiedModel(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
         best_loss_2n = 1000  # initialise best loss big - only save models if they beat the current best loss
         best_params_2n = [param.numpy() for param in hln_2n.params]
         for nSD in nSDs:
-            init_nonlin(X=inputs, model=hln_2n, lin_model=hln_2l, nSD=nSD)
+            init_nonlin_tied(X=inputs, model=hln_2n, lin_model=hln_2l, nSD=nSD)
             train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
                         val_inputs=val_inputs, val_target=val_target)
             final_loss = loss(hln_2n(train_inputs), train_target).numpy()
             if final_loss < best_loss_2n:
-                final_loss = best_loss_2n
+                best_loss_2n = final_loss
                 best_params_2n = [param.numpy() for param in hln_2n.params]
 
         # train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
@@ -165,20 +164,20 @@ def validate_fit(target_model, num_sims, inputs):
 
         # continue procedure with more complex models: 3N:
         print("2N training finished, beginning 3N training")
-        hln_3l = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
+        hln_3l = hLN_TiedModel(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
                                                                                  False, False, False, False]))
-        update_arch(prev_model=hln_2n, next_model=hln_3l)
-        hln_3n = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
+        update_arch_tied(prev_model=hln_2n, next_model=hln_3l)
+        hln_3n = hLN_TiedModel(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
                                                                                  True, True, True, True]))
         best_loss_3n = 1000  # initialise best loss big - only save models if they beat the current best loss
         best_params_3n = [param.numpy() for param in hln_3n.params]
         for nSD in nSDs:
-            init_nonlin(X=inputs, model=hln_3n, lin_model=hln_3l, nSD=nSD)
+            init_nonlin_tied(X=inputs, model=hln_3n, lin_model=hln_3l, nSD=nSD)
             train_until(model=hln_3n, train_inputs=train_inputs, train_target=train_target,
                         val_inputs=val_inputs, val_target=val_target)
             final_loss = loss(hln_3n(train_inputs), train_target).numpy()
             if final_loss < best_loss_3n:
-                final_loss = best_loss_3n
+                best_loss_3n = final_loss
                 best_params_3n = [param.numpy() for param in hln_3n.params]
 
         # init_nonlin(X=inputs, model=hln_3n, lin_model=hln_3l, nSD=50)
@@ -191,22 +190,22 @@ def validate_fit(target_model, num_sims, inputs):
 
         # continue procedure with more complex models: 4N:
         print("3N training finished, beginning 4N training")
-        hln_4l = hLN_Model(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n, sig_on=tf.constant([True, True, True, True, True, True, True,
+        hln_4l = hLN_TiedModel(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n, sig_on=tf.constant([True, True, True, True, True, True, True,
                                                                                  False, False, False, False, False, False,
                                                                                  False, False]))
-        update_arch(prev_model=hln_3n, next_model=hln_4l)
-        hln_4n = hLN_Model(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n, sig_on=tf.constant([True, True, True, True, True, True, True,
+        update_arch_tied(prev_model=hln_3n, next_model=hln_4l)
+        hln_4n = hLN_TiedModel(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n, sig_on=tf.constant([True, True, True, True, True, True, True,
                                                                                  True, True, True, True, True, True, True,
                                                                                  True]))
         best_loss_4n = 1000  # initialise best loss big - only save models if they beat the current best loss
         best_params_4n = [param.numpy() for param in hln_4n.params]
         for nSD in nSDs:
-            init_nonlin(X=inputs, model=hln_4n, lin_model=hln_4l, nSD=nSD)
+            init_nonlin_tied(X=inputs, model=hln_4n, lin_model=hln_4l, nSD=nSD)
             train_until(model=hln_4n, train_inputs=train_inputs, train_target=train_target,
                         val_inputs=val_inputs, val_target=val_target)
             final_loss = loss(hln_4n(train_inputs), train_target).numpy()
             if final_loss < best_loss_4n:
-                final_loss = best_loss_4n
+                best_loss_4n = final_loss
                 best_params_4n = [param.numpy() for param in hln_4n.params]
 
         # init_nonlin(X=inputs, model=hln_4n, lin_model=hln_4l, nSD=50)
