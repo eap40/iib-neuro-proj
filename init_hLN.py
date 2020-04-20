@@ -167,7 +167,7 @@ def init_nonlin_tied(X, model, lin_model, nSD, dt=1):
     # to extend to more subunits, make everything numpy so we can assign it. Then convert back to tensors at the end
     Jc, Wce, Wci = model.Jc, model.Wce, model.Wci
     # params should be parameters of a previously created hLN model - convert to numpy so we can assign
-    v0, log_Jw, Wwe, Wwi, log_Tau_e, log_Tau_i, Th, log_Delay = [param.numpy() for param in model.params]
+    v0, log_Jw, Wwe, Wwi, log_Tau_e, log_Tau_i, Th, log_Delay = [param.numpy() for param in model.trainable_params]
 
     # these parameters defined by their logs to ensure positivity - convert here
     Jw, Tau_e, Tau_i, Delay = np.exp(log_Jw), np.exp(log_Tau_e), np.exp(log_Tau_i), np.exp(log_Delay)
