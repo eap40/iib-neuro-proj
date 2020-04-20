@@ -190,10 +190,21 @@ def init_nonlin_tied(X, model, lin_model, nSD, dt=1):
     model.Wwi.assign(Wwi)
     model.logJw.assign(np.log(Jw))
 
-    logTaues = tf.fill(dims=[model.n_e], value=model.logTaue)
-    logTauis = tf.fill(dims=[model.n_i], value=model.logTaui)
-    Wwes = tf.fill(dims=[model.n_e], value=model.Wwe)
-    Wwis = tf.fill(dims=[model.n_i], value=model.Wwi)
+    #     logTaues = tf.fill(dims=[model.n_e], value=model.logTaue)
+    #     logTauis = tf.fill(dims=[model.n_i], value=model.logTaui)
+    #     Wwes = tf.fill(dims=[model.n_e], value=model.Wwe)
+    #     Wwis = tf.fill(dims=[model.n_i], value=model.Wwi)
+
+    logTaues = []
+    logTauis = []
+    Wwes = []
+    Wwis = []
+    for m in range(len(model.Jc)):
+        logTaues = tf.concat((logTaues, tf.fill(dims=[len(model.Wce[m])], value=model.logTaue[m])), axis=0)
+        logTauis = tf.concat((logTaues, tf.fill(dims=[len(model.Wci[m])], value=model.logTaui[m])), axis=0)
+        Wwes = tf.concat((Wwes, tf.fill(dims=[len(model.Wce[m])], value=model.Wwe[m])), axis=0)
+        Wwis = tf.concat((Wwis, tf.fill(dims=[len(model.Wci[m])], value=model.Wwi[m])), axis=0)
+
     model.params = (model.v0, model.logJw, Wwes, Wwis, logTaues, logTauis,
                     model.Th, model.logDelay)
     Y = sim_inputs(X=X, dt=1, Jc=model.Jc, Wce=model.Wce, Wci=model.Wci, params=model.params, sig_on=model.sig_on)
@@ -210,8 +221,11 @@ def init_nonlin_tied(X, model, lin_model, nSD, dt=1):
         # print(alpha)
         if len(Wce[leaf - 1] > 0):  # if leaf has any e neurons connected to it
             Wwes[(Wce[leaf - 1])] /= alpha
+            Wwe[leaf - 1] /= alpha
+
         if len(Wci[leaf - 1] > 0):  # if leaf has any i neurons connected to it
             Wwis[(Wci[leaf - 1] - model.n_e)] /= alpha
+            Wwi[leaf - 1] /= alpha
 
         Th[leaf - 1] = np.mean(Y[leaf - 1, :]) / alpha
 
@@ -227,10 +241,60 @@ def init_nonlin_tied(X, model, lin_model, nSD, dt=1):
     logJw, logTaue, logTaui, logDelay = np.log(Jw), np.log(Tau_e), np.log(Tau_i), np.log(Delay)
 
     model.logJw.assign(logJw)
-    model.Wwe.assign(tf.reduce_mean(Wwes))
-    model.Wwi.assign(tf.reduce_mean(Wwis))
+    model.Wwe.assign(Wwe)
+    model.Wwi.assign(Wwi)
     model.Th.assign(Th)
     model.logDelay.assign(logDelay)
     model.v0.assign(v0)
+
+    return
+
+
+
+def update_arch_tied(prev_model, next_model):
+    """Function to assign the correct parameters to a new architecture which has added new linear leaf subunits
+    from the previous architecture. The Jc, Wce and Wci of the new architecture are known, so the synaptic
+    parameters just need to be redistributed accordingly. This new function is required for the tied models,
+    as the parameters are defined differently and so need to be redistributed differently also."""
+
+    # first change hLN attributes into numpy - allows assignment and should be easier to manipulate
+    logJw = next_model.logJw.numpy()
+    logDelay = next_model.logDelay.numpy()
+    Th = next_model.Th.numpy()
+    Wwe, Wwi = next_model.Wwe.numpy(), next_model.Wwi.numpy()
+    logTaue, logTaui = next_model.logTaue.numpy(), next_model.logTaui.numpy()
+
+    # then initialise 'substructure' of new model to be identical to previous model (i.e. subsection of new
+    # architecture that made up the previous model)
+    M_old = len(prev_model.Jc)
+    logJw[:M_old] = prev_model.logJw.numpy()
+    logDelay[:M_old] = prev_model.logDelay.numpy()
+    Th[:M_old] = prev_model.Th.numpy()
+    Wwe[:M_old], Wwi[:M_old] = prev_model.Wwe.numpy(), prev_model.Wwi.numpy()
+    logTaue[:M_old], logTaui[:M_old] = prev_model.logTaue.numpy(), prev_model.logTaui.numpy()
+
+    # work out which subunits we have just added - for these cases should just be the leaves
+    M = len(next_model.Jc)
+    leaves = np.setdiff1d(np.arange(1, M + 1, 1), next_model.Jc)
+    for leaf in leaves:
+        logJw[leaf - 1] = 0  # set subunit gain to 1 for all new leaves
+        # then set delay to the delay of the subunit parent from the previous model
+        parent = next_model.Jc[leaf - 1]
+        logDelay[leaf - 1] = prev_model.logDelay.numpy()[parent - 1]
+        # also set weights and time constants to those of subunit parent in previous model
+        Wwe[leaf - 1] = prev_model.Wwe.numpy()[parent - 1]
+        Wwi[leaf - 1] = prev_model.Wwi.numpy()[parent - 1]
+        logTaue[leaf - 1] = prev_model.logTaue.numpy()[parent - 1]
+        logTaui[leaf - 1] = prev_model.logTaui.numpy()[parent - 1]
+
+    # assign the newly calculated parameters to the new model
+    next_model.Wwe.assign(Wwe)
+    next_model.Wwi.assign(Wwi)
+    next_model.logTaue.assign(logTaue)
+    next_model.logTaui.assign(logTaui)
+    next_model.logJw.assign(logJw)
+    next_model.logDelay.assign(logDelay)
+    next_model.Th.assign(Th)
+    next_model.v0.assign(prev_model.v0)
 
     return
