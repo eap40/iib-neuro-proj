@@ -49,7 +49,8 @@ def run():
     hln_1l_tied = hLN_TiedModel(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
 
     # validate_fit function
-    target_params_list, trained_params_list = validate_fit(target_model=hln_1l_tied, num_sims=5, inputs=inputs)
+    target_params_list, tied_trained_params_list, untied_trained_params_list = validate_fit(target_model=hln_1l,
+                                                                                            num_sims=5, inputs=inputs)
 
     # training debug
     # target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_1l, inputs=inputs, nSD=1)
@@ -60,7 +61,8 @@ def run():
     #                                                                               num_epochs=5000, learning_rate=0.001)
 
     # save data
-    np.savez_compressed('/scratch/eap40/val_tied_1lt', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/val_untied_1l', a=target_params_list, b=tied_trained_params_list,
+                        c=untied_trained_params_list, d=inputs)
 
     print("Procedure finished")
 
@@ -102,7 +104,8 @@ def validate_fit(target_model, num_sims, inputs):
     test_inputs = inputs[:, -n_test:]
 
     target_params_list = []
-    trained_params_list = []
+    tied_trained_params_list = []
+    untied_trained_params_list = []
 
     # define nSDs: when we step up a model, we'll initialise multiple models with different nSDs and then pick the
     # one with lowest training error after training
@@ -124,6 +127,14 @@ def validate_fit(target_model, num_sims, inputs):
                                                     val_inputs=val_inputs, val_target=val_target)
 
 
+        # after tied model trained, untie parameters and train until val loss goes down
+        untied_hln_1l = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
+        for i in range(len(hln_1l.params)):
+            untied_hln_1l.params[i].assign(hln_1n.params[i].numpy())
+        train_until(model=untied_hln_1l, train_inputs=train_inputs, train_target=train_target,
+                    val_inputs=val_inputs, val_target=val_target)
+
+
         # continue procedure with more complex models: 1N:
         print("1L training finished, beginning 1N training")
         hln_1n = hLN_TiedModel(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
@@ -137,6 +148,14 @@ def validate_fit(target_model, num_sims, inputs):
             if final_loss < best_loss_1n:
                 best_loss_1n = final_loss
                 best_params_1n = [param.numpy() for param in hln_1n.params]
+
+        # after tied model trained, untie parameters and train until val loss goes down
+        # initialise best set of tied parameters - can initialise exactly so tied should be true lower bound on untied
+        untied_hln_1n = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
+        for i in range(len(hln_1n.params)):
+            untied_hln_1n.params[i].assign(best_params_1n[i])
+        train_until(model=untied_hln_1n, train_inputs=train_inputs, train_target=train_target,
+                    val_inputs=val_inputs, val_target=val_target)
 
 
         # continue procedure with more complex models: 2N:
@@ -155,12 +174,15 @@ def validate_fit(target_model, num_sims, inputs):
                 best_loss_2n = final_loss
                 best_params_2n = [param.numpy() for param in hln_2n.params]
 
-        # train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
-        #                                             val_inputs=val_inputs, val_target=val_target)
-        # optimizer_2n = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
-        #                                         epsilon=1e-07, amsgrad=True)
-        # loss_values_2n, accuracies_2n = train_sgd(model=hln_2n, num_epochs=5000, optimizer=optimizer_2n,
-        #                                           inputs=train_inputs, target=train_target)
+
+        # after tied model trained, untie parameters and train until val loss goes down
+        # initialise best set of tied parameters - can initialise exactly so tied should be true lower bound on untied
+        untied_hln_2n = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
+        for i in range(len(hln_2n.params)):
+            untied_hln_2n.params[i].assign(best_params_2n[i])
+        train_until(model=untied_hln_2n, train_inputs=train_inputs, train_target=train_target,
+                    val_inputs=val_inputs, val_target=val_target)
+
 
         # continue procedure with more complex models: 3N:
         print("2N training finished, beginning 3N training")
@@ -180,13 +202,17 @@ def validate_fit(target_model, num_sims, inputs):
                 best_loss_3n = final_loss
                 best_params_3n = [param.numpy() for param in hln_3n.params]
 
-        # init_nonlin(X=inputs, model=hln_3n, lin_model=hln_3l, nSD=50)
-        # # train_until(model=hln_3n, train_inputs=train_inputs, train_target=train_target,
-        # #                                             val_inputs=val_inputs, val_target=val_target)
-        # # optimizer_3n = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
-        # #                                         epsilon=1e-07, amsgrad=True)
-        # loss_values_3n, accuracies_3n = train_sgd(model=hln_3n, num_epochs=5000, optimizer=optimizer_3n,
-        #                                           inputs=train_inputs, target=train_target)
+
+        # after tied model trained, untie parameters and train until val loss goes down
+        # initialise best set of tied parameters - can initialise exactly so tied should be true lower bound on untied
+        untied_hln_3n = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
+                                                                                 True, True, True, True]))
+        for i in range(len(hln_3n.params)):
+            untied_hln_3n.params[i].assign(best_params_3n[i])
+        train_until(model=untied_hln_3n, train_inputs=train_inputs, train_target=train_target,
+                    val_inputs=val_inputs, val_target=val_target)
+
+
 
         # continue procedure with more complex models: 4N:
         print("3N training finished, beginning 4N training")
@@ -208,32 +234,41 @@ def validate_fit(target_model, num_sims, inputs):
                 best_loss_4n = final_loss
                 best_params_4n = [param.numpy() for param in hln_4n.params]
 
-        # init_nonlin(X=inputs, model=hln_4n, lin_model=hln_4l, nSD=50)
-        # # train_until(model=hln_4n, train_inputs=train_inputs, train_target=train_target,
-        # #                                             val_inputs=val_inputs, val_target=val_target)
-        # optimizer_4n = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
-        #                                         epsilon=1e-07, amsgrad=True)
-        # loss_values_4n, accuracies_4n = train_sgd(model=hln_4n, num_epochs=5000, optimizer=optimizer_4n,
-        #                                           inputs=train_inputs, target=train_target)
+
+        # after tied model trained, untie parameters and train until val loss goes down
+        # initialise best set of tied parameters - can initialise exactly so tied should be true lower bound on untied
+        untied_hln_4n = hLN_Model(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n, sig_on=tf.constant([True, True, True, True, True, True, True,
+                                                                                 False, False, False, False, False, False,
+                                                                                 False, False]))
+        for i in range(len(hln_4n.params)):
+            untied_hln_4n.params[i].assign(best_params_4n[i])
+        train_until(model=untied_hln_4n, train_inputs=train_inputs, train_target=train_target,
+                    val_inputs=val_inputs, val_target=val_target)
+
 
         print("4N training finished, procedure ending")
 
-        # # return parameters of all trained models, and parameters of target model
+        # # return parameters of all trained models (tied and untied), and parameters of target model
         params_1l = [param.numpy() for param in hln_1l.params]
-        # params_1n = [param.numpy() for param in hln_1n.params]
-        # params_2n = [param.numpy() for param in hln_2n.params]
-        # params_3n = [param.numpy() for param in hln_3n.params]
-        # params_4n = [param.numpy() for param in hln_4n.params]
+        untied_params_1l = [param.numpy() for param in untied_hln_1l.params]
+        untied_params_1n = [param.numpy() for param in untied_hln_1n.params]
+        untied_params_2n = [param.numpy() for param in untied_hln_2n.params]
+        untied_params_3n = [param.numpy() for param in untied_hln_3n.params]
+        untied_params_4n = [param.numpy() for param in untied_hln_4n.params]
+
+
 
         target_params = [param.numpy() for param in target_model.params]
 
-        trained_params = [params_1l, best_params_1n, best_params_2n, best_params_3n, best_params_4n]
+        tied_trained_params = [params_1l, best_params_1n, best_params_2n, best_params_3n, best_params_4n]
+        untied_trained_params = [untied_params_1l, untied_params_1n, untied_params_2n,untied_params_3n,untied_params_4n]
 
         # add recovered and target parameters to list we will later save
         target_params_list.append(target_params)
-        trained_params_list.append(trained_params)
+        untied_trained_params_list.append(untied_trained_params)
+        tied_trained_params_list.append(tied_trained_params)
 
-    return target_params_list, trained_params_list
+    return target_params_list, tied_trained_params_list, untied_trained_params_list
 
 
 def test_recovery(model, inputs, num_sims, n_attempts, num_epochs, learning_rate, enforce_params=False):
