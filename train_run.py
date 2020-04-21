@@ -238,8 +238,8 @@ def validate_fit(target_model, num_sims, inputs):
         # after tied model trained, untie parameters and train until val loss goes down
         # initialise best set of tied parameters - can initialise exactly so tied should be true lower bound on untied
         untied_hln_4n = hLN_Model(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n, sig_on=tf.constant([True, True, True, True, True, True, True,
-                                                                                 False, False, False, False, False, False,
-                                                                                 False, False]))
+                                                                                 True, True, True, True, True, True, True,
+                                                                                 True]))
         for i in range(len(hln_4n.params)):
             untied_hln_4n.params[i].assign(best_params_4n[i])
         train_until(model=untied_hln_4n, train_inputs=train_inputs, train_target=train_target,
