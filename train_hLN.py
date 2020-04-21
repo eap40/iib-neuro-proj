@@ -281,7 +281,7 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
                                               epsilon=1e-07, amsgrad=True)
 
     # set maximum training epochs at 10000 - stop before if condition satisfied
-    for epoch in range(10000):
+    for epoch in tqdm(range(10000)):
 
         t_start = int(np.random.uniform(0, n_train - n_points))
         loss_value, grads = grad_subset(model=model, inputs=train_inputs[:, t_start: t_start + n_points],
