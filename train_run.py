@@ -126,6 +126,7 @@ def validate_fit(target_model, num_sims, inputs):
         train_until(model=hln_1l, train_inputs=train_inputs, train_target=train_target,
                                                     val_inputs=val_inputs, val_target=val_target)
 
+        print(tf.executing_eagerly())
 
         # after tied model trained, untie parameters and train until val loss goes down
         untied_hln_1l = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
