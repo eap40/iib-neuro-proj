@@ -132,6 +132,7 @@ def validate_fit(target_model, num_sims, inputs):
         untied_hln_1l = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
         print(tf.executing_eagerly())
         for i in range(len(hln_1l.params)):
+            print(i)
             untied_hln_1l.params[i].assign(hln_1l.params[i].numpy())
         train_until(model=untied_hln_1l, train_inputs=train_inputs, train_target=train_target,
                     val_inputs=val_inputs, val_target=val_target)
