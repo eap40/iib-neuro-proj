@@ -359,7 +359,7 @@ def validate_fit_data(target_model, num_sims, inputs):
 
 
         # continue procedure with more complex models: 4N:
-        hln_4n = hLN_TiedModel(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n, sig_on=tf.constant([True, True, True, True, True, True, True,
+        hln_4n = hLN_Model(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n, sig_on=tf.constant([True, True, True, True, True, True, True,
                                                                                  True, True, True, True, True, True, True,
                                                                                  True]))
         train_until(model=hln_4n, train_inputs=train_inputs, train_target=train_target,
@@ -369,7 +369,6 @@ def validate_fit_data(target_model, num_sims, inputs):
         print("4N training finished, procedure ending")
 
         # # return parameters of all trained models (tied and untied), and parameters of target model
-        params_1l = [param.numpy() for param in hln_1l.params]
         params_1l = [param.numpy() for param in hln_1l.params]
         params_1n = [param.numpy() for param in hln_1n.params]
         params_2n = [param.numpy() for param in hln_2n.params]
