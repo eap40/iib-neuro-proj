@@ -281,7 +281,7 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
                                               epsilon=1e-07, amsgrad=True)
 
     # set maximum training epochs at 10000 - stop before if condition satisfied
-    for epoch in tqdm(range(100000)):
+    for epoch in tqdm(range(25000)):
 
         t_start = int(np.random.uniform(0, n_train - n_points))
         loss_value, grads = grad_subset(model=model, inputs=train_inputs[:, t_start: t_start + n_points],
@@ -295,13 +295,13 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
         # val_losses.append(val_loss)
 
          # check validation loss every 1000 training epochs:
-        if epoch % 1000 == 0:
-            # if new loss is bigger than old loss, stop training - stochastic but polling every 1000 epochs should help
-            val_loss = loss(model(val_inputs), val_target)
-            if (val_loss - last_val_loss) > 0:
-                break
-            else:
-                last_val_loss = val_loss
+        # if epoch % 1000 == 0:
+        #     # if new loss is bigger than old loss, stop training - stochastic but polling every 1000 epochs should help
+        #     val_loss = loss(model(val_inputs), val_target)
+        #     if (val_loss - last_val_loss) > 0:
+        #         break
+        #     else:
+        #         last_val_loss = val_loss
 
         optimizer_adam.apply_gradients(zip(grads, model.trainable_params))
 
