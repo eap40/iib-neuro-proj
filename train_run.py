@@ -20,10 +20,10 @@ def run():
             print(e)
 
     # Lets generate some inputs this time
-    E_spikes, I_spikes = gen_realistic_inputs(Tmax=3000)
+    E_spikes, I_spikes = gen_realistic_inputs(Tmax=10000)
     #
-    X_e = spikes_to_input(E_spikes, Tmax=48000)
-    X_i = spikes_to_input(I_spikes, Tmax=48000)
+    X_e = spikes_to_input(E_spikes, Tmax=160000)
+    X_i = spikes_to_input(I_spikes, Tmax=160000)
     X_tot = np.vstack((X_e, X_i))
 
     # X_tot = tf.convert_to_tensor(np.load('Data/real_inputs.npy'), dtype=tf.float32)  # real inputs made earlier
@@ -49,8 +49,11 @@ def run():
     hln_1l_tied = hLN_TiedModel(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
 
     # validate_fit function
-    target_params_list, tied_trained_params_list, untied_trained_params_list = validate_fit(target_model=hln_1l,
-                                                                                            num_sims=5, inputs=inputs)
+    # target_params_list, tied_trained_params_list, untied_trained_params_list = validate_fit(target_model=hln_1l,
+    #                                                                                         num_sims=5, inputs=inputs)
+
+    # validate_fit_data function
+    target_params_list, trained_params_list = validate_fit_data(target_model=hln_1l, num_sims=5, inputs=inputs)
 
     # training debug
     # target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_1l, inputs=inputs, nSD=1)
@@ -61,8 +64,7 @@ def run():
     #                                                                               num_epochs=5000, learning_rate=0.001)
 
     # save data
-    np.savez_compressed('/scratch/eap40/1lv_1n', a=target_params_list, b=tied_trained_params_list,
-                        c=untied_trained_params_list, d=inputs)
+    np.savez_compressed('/scratch/eap40/val_data_1l', a=target_params_list, b=trained_params_list, c=inputs)
 
     print("Procedure finished")
 
@@ -275,6 +277,114 @@ def validate_fit(target_model, num_sims, inputs):
         tied_trained_params_list.append(tied_trained_params)
 
     return target_params_list, tied_trained_params_list, untied_trained_params_list
+
+
+def validate_fit_data(target_model, num_sims, inputs):
+    """Function to validate the model fitting procedure, producing output similar to that in Figure S2 of the
+    Ujfalussy paper. Finds the performance of different models (1L-4N) in approximating a target signal generated
+    by hLN model target_model. Repeats the procedure for num_sims settings of the target model parameters. Instead
+    of complex procedure of intialising and tying etc, instead uses more input/output data to achieve performance"""
+
+    ### Define the different hLN architectures we will be using:
+    # 1L
+    Jc_1l = np.array([0])
+    # 1N
+    Jc_1n = np.array([0])
+    # 2N
+    Jc_2n = np.array([0, 1, 1])
+    # 3N
+    Jc_3n = np.array([0, 1, 1, 2, 2, 3, 3])
+    # 4N
+    Jc_4n = np.array([0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7])
+
+    # list of lists for to define hierarchical clustering
+    clusts = [[[[[0, 1], [2]], [[3, 4], [5, 6]]], [[[7, 8], [9]], [[10, 11], [12]]]]]
+
+    Wce_1l, Wci_1l = create_weights(Jc_1l, n_levels=1, clusts=clusts)
+    Wce_2n, Wci_2n = create_weights(Jc_2n, n_levels=2, clusts=clusts)
+    Wce_3n, Wci_3n = create_weights(Jc_3n, n_levels=3, clusts=clusts)
+    Wce_4n, Wci_4n = create_weights(Jc_4n, n_levels=4, clusts=clusts)
+
+    # split input data into training, validation and test sets
+    L = inputs.shape[1]
+    train_split = 0.7
+    n_train = int(L * train_split)
+    train_inputs = inputs[:, :n_train]
+    val_split = 0.1
+    n_val = int(L * val_split)
+    val_inputs = inputs[:, n_train:n_train + n_val]
+    n_test = L - n_train - n_val
+    test_inputs = inputs[:, -n_test:]
+
+    target_params_list = []
+    trained_params_list = []
+
+    # repeat procedure multiple times
+    for sim in range(num_sims):
+
+        # randomise parameters, and generate the target trace
+        target_model.randomise_parameters()
+        train_target = target_model(train_inputs)
+        val_target = target_model(val_inputs)
+        test_target = target_model(test_inputs)
+
+        # start off with 1L model, and train until some performance on validation set
+        print("Beginning 1L training")
+        # after tied model trained, untie parameters and train until val loss goes down
+        hln_1l = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
+        train_until(model=hln_1l, train_inputs=train_inputs, train_target=train_target,
+                    val_inputs=val_inputs, val_target=val_target)
+
+
+        # continue procedure with more complex models: 1N:
+        print("1L training finished, beginning 1N training")
+        hln_1n = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
+        train_until(model=hln_1n, train_inputs=train_inputs, train_target=train_target,
+                                                        val_inputs=val_inputs, val_target=val_target)
+
+
+        # continue procedure with more complex models: 2N:
+        print("1N training finished, beginning 2N training")
+        hln_2n = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
+        train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
+                        val_inputs=val_inputs, val_target=val_target)
+
+
+        # continue procedure with more complex models: 3N:
+        print("2N training finished, beginning 3N training")
+        hln_3n = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
+                                                                                 True, True, True, True]))
+        train_until(model=hln_3n, train_inputs=train_inputs, train_target=train_target,
+                        val_inputs=val_inputs, val_target=val_target)
+
+
+        # continue procedure with more complex models: 4N:
+        hln_4n = hLN_TiedModel(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n, sig_on=tf.constant([True, True, True, True, True, True, True,
+                                                                                 True, True, True, True, True, True, True,
+                                                                                 True]))
+        train_until(model=hln_4n, train_inputs=train_inputs, train_target=train_target,
+                        val_inputs=val_inputs, val_target=val_target)
+
+
+        print("4N training finished, procedure ending")
+
+        # # return parameters of all trained models (tied and untied), and parameters of target model
+        params_1l = [param.numpy() for param in hln_1l.params]
+        params_1l = [param.numpy() for param in hln_1l.params]
+        params_1n = [param.numpy() for param in hln_1n.params]
+        params_2n = [param.numpy() for param in hln_2n.params]
+        params_3n = [param.numpy() for param in hln_3n.params]
+        params_4n = [param.numpy() for param in hln_4n.params]
+
+        target_params = [param.numpy() for param in target_model.params]
+
+        trained_params = [params_1l, params_1n, params_2n, params_3n, params_4n]
+
+        # add recovered and target parameters to list we will later save
+        target_params_list.append(target_params)
+        trained_params_list.append(trained_params)
+
+    return target_params_list, trained_params_list
 
 
 def test_recovery(model, inputs, num_sims, n_attempts, num_epochs, learning_rate, enforce_params=False):
