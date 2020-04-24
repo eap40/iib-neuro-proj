@@ -20,10 +20,10 @@ def run():
             print(e)
 
     # Lets generate some inputs this time
-    E_spikes, I_spikes = gen_realistic_inputs(Tmax=10000)
+    E_spikes, I_spikes = gen_realistic_inputs(Tmax=3000)
     #
-    X_e = spikes_to_input(E_spikes, Tmax=160000)
-    X_i = spikes_to_input(I_spikes, Tmax=160000)
+    X_e = spikes_to_input(E_spikes, Tmax=48000)
+    X_i = spikes_to_input(I_spikes, Tmax=48000)
     X_tot = np.vstack((X_e, X_i))
 
     # X_tot = tf.convert_to_tensor(np.load('Data/real_inputs.npy'), dtype=tf.float32)  # real inputs made earlier
@@ -53,7 +53,7 @@ def run():
     #                                                                                         num_sims=5, inputs=inputs)
 
     # validate_fit_data function
-    target_params_list, trained_params_list = validate_fit_data(target_model=hln_1l, num_sims=5, inputs=inputs)
+    target_params_list, tied_trained_params_list, untied_trained_params_list = validate_fit(target_model=hln_1l, num_sims=1, inputs=inputs)
 
     # training debug
     # target_params, trained_params, train_losses, val_losses = debug_training(target_model=hln_1l, inputs=inputs, nSD=1)
@@ -64,7 +64,8 @@ def run():
     #                                                                               num_epochs=5000, learning_rate=0.001)
 
     # save data
-    np.savez_compressed('/scratch/eap40/val_data_1l2', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/1lv1n_2', a=target_params_list, b=tied_trained_params_list,
+                        c=untied_trained_params_list, d=inputs)
 
     print("Procedure finished")
 
