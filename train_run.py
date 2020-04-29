@@ -63,7 +63,7 @@ def run():
     #                                                                               num_epochs=5000, learning_rate=0.001)
 
     # save data
-    np.savez_compressed('/scratch/eap40/val_tu_1l2', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/val_tu_1l3', a=target_params_list, b=trained_params_list, c=inputs)
 
     print("Procedure finished")
 
@@ -109,7 +109,7 @@ def validate_fit(target_model, num_sims, inputs):
 
     # define nSDs: when we step up a model, we'll initialise multiple models with different nSDs and then pick the
     # one with lowest training error after training
-    nSDs = [1, 2, 4]
+    nSDs = [4, 8, 16]
 
     # repeat procedure multiple times
     for sim in range(num_sims):
