@@ -20,10 +20,10 @@ def run():
             print(e)
 
     # Lets generate some inputs this time
-    E_spikes, I_spikes = gen_realistic_inputs(Tmax=15000)
+    E_spikes, I_spikes = gen_realistic_inputs(Tmax=10000)
     #
-    X_e = spikes_to_input(E_spikes, Tmax=240000)
-    X_i = spikes_to_input(I_spikes, Tmax=240000)
+    X_e = spikes_to_input(E_spikes, Tmax=160000)
+    X_i = spikes_to_input(I_spikes, Tmax=160000)
     X_tot = np.vstack((X_e, X_i))
 
     # X_tot = tf.convert_to_tensor(np.load('Data/real_inputs.npy'), dtype=tf.float32)  # real inputs made earlier
