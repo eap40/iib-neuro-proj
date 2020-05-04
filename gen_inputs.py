@@ -31,7 +31,7 @@ def gen_realistic_inputs(Tmax):
         rate_inh = np.zeros(Tmax)
         for den in range(13):
             # generate 13 independent ensembles
-            st = gen_events_sin(Tmax=Tmax, alpha=alphas[int((ori-ori_dends[den]) % 16)], beta=beta, maxL=150)
+            st = gen_events_sin2(Tmax=Tmax, alpha=alphas[int((ori-ori_dends[den]) % 16)], beta=beta, maxL=150)
             rate_inh += Insyn[den] * (st * (Irate[1] - Irate[0]) + Irate[0])
             spt_Eden = gen_spikes_states(Tmax=Tmax, N=Ensyn[den], mu=Erate, tau=500, x=st, sd=Esd)
             if den > 0:
