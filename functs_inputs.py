@@ -154,13 +154,18 @@ def gen_events_sin2(Tmax, alpha, beta, maxL=None):
     events = gen_poisson_events(Tmax=Tmax, rate=max_rate)
     events_kept = np.array([])
     # use thinning to generate event times according to down to up transition rate
-    for event_time in events:
-        # rate rr is sine function of stimulus orientation and time
-        rr = (np.sin(event_time / 500 * 2 * np.pi + 150) + 1) * alpha / 2
-        p_keep = rr / max_rate # probability of keeping Poisson event at time tt
-        if np.random.uniform() < p_keep:
-            # keep event
-            events_kept = np.append(events_kept, event_time)
+    try:
+        for event_time in events:
+            # rate rr is sine function of stimulus orientation and time
+            rr = (np.sin(event_time / 500 * 2 * np.pi + 150) + 1) * alpha / 2
+            p_keep = rr / max_rate # probability of keeping Poisson event at time tt
+            if np.random.uniform() < p_keep:
+                # keep event
+                events_kept = np.append(events_kept, event_time)
+
+    except TypeError:
+        # TypeError if no events returned by gen_poisson_events - pass as we have already initalised empty events_kept
+        pass
 
     # events kept should now contain events generated according to inhomogeneous Poisson process, with rate defined by
     # down to up sine function
@@ -173,7 +178,11 @@ def gen_events_sin2(Tmax, alpha, beta, maxL=None):
     st = np.zeros(Tmax)  # array of states, will be binary
 
     # first transition is down to up, with event time the first event in events_kept
-    tt = events_kept[0]
+    try:
+        tt = events_kept[0]
+    except IndexError:
+        # if there are no events in events kept, then return st as all zeros (stays in down state)
+        return st
     last_down_tt = events_kept[-1]  # last time at which there is a down to up transition
     state = 1  # in up state after this first transition
     durations = []
