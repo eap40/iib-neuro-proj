@@ -282,7 +282,7 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
                                               epsilon=1e-07, amsgrad=True)
 
     # set maximum training epochs at 10000 - stop before if condition satisfied
-    max_epochs = 20000
+    max_epochs = 100
     for epoch in tqdm(range(max_epochs)):
 
         t_start = int(np.random.uniform(0, n_train - n_points))
