@@ -305,8 +305,9 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
                 print(f"Epochs trained:{epoch}")
                 break
             else:
-                last_val_loss1 = val_loss
                 last_val_loss2 = last_val_loss1
+                last_val_loss1 = val_loss
+
 
         optimizer_adam.apply_gradients(zip(grads, model.trainable_params))
 
