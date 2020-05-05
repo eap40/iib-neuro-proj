@@ -63,7 +63,7 @@ def run():
     #                                                                               num_epochs=5000, learning_rate=0.001)
 
     # save data
-    np.savez_compressed('/scratch/eap40/val_tu_1n6', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/val_tu_1n7', a=target_params_list, b=trained_params_list, c=inputs)
 
     print("Procedure finished")
 
