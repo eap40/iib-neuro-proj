@@ -63,7 +63,7 @@ def run():
     #                                                                               num_epochs=5000, learning_rate=0.001)
 
     # save data
-    np.savez_compressed('/scratch/eap40/val_tu_1n5', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/val_tu_1n6', a=target_params_list, b=trained_params_list, c=inputs)
 
     print("Procedure finished")
 
@@ -133,7 +133,7 @@ def validate_fit(target_model, num_sims, inputs):
         best_loss_1n = 1000  # initialise best loss big - only save models if they beat the current best loss
         best_params_1n = [param.numpy() for param in hln_1n.params]
         for nSD in nSDs:
-            init_nonlin(X=inputs, model=hln_1n, lin_model=hln_1l, nSD=nSD)
+            init_nonlin(X=train_inputs, model=hln_1n, lin_model=hln_1l, nSD=nSD)
             train_until(model=hln_1n, train_inputs=train_inputs, train_target=train_target,
                                                         val_inputs=val_inputs, val_target=val_target)
             final_loss = loss(hln_1n(train_inputs), train_target).numpy()
@@ -153,7 +153,7 @@ def validate_fit(target_model, num_sims, inputs):
         best_loss_2n = 1000  # initialise best loss big - only save models if they beat the current best loss
         best_params_2n = [param.numpy() for param in hln_2n.params]
         for nSD in nSDs:
-            init_nonlin(X=inputs, model=hln_2n, lin_model=hln_2l, nSD=nSD)
+            init_nonlin(X=train_inputs, model=hln_2n, lin_model=hln_2l, nSD=nSD)
             train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
                         val_inputs=val_inputs, val_target=val_target)
             final_loss = loss(hln_2n(train_inputs), train_target).numpy()
@@ -175,7 +175,7 @@ def validate_fit(target_model, num_sims, inputs):
         best_loss_3n = 1000  # initialise best loss big - only save models if they beat the current best loss
         best_params_3n = [param.numpy() for param in hln_3n.params]
         for nSD in nSDs:
-            init_nonlin(X=inputs, model=hln_3n, lin_model=hln_3l, nSD=nSD)
+            init_nonlin(X=train_inputs, model=hln_3n, lin_model=hln_3l, nSD=nSD)
             train_until(model=hln_3n, train_inputs=train_inputs, train_target=train_target,
                         val_inputs=val_inputs, val_target=val_target)
             final_loss = loss(hln_3n(train_inputs), train_target).numpy()
@@ -199,7 +199,7 @@ def validate_fit(target_model, num_sims, inputs):
         best_loss_4n = 1000  # initialise best loss big - only save models if they beat the current best loss
         best_params_4n = [param.numpy() for param in hln_4n.params]
         for nSD in nSDs:
-            init_nonlin(X=inputs, model=hln_4n, lin_model=hln_4l, nSD=nSD)
+            init_nonlin(X=train_inputs, model=hln_4n, lin_model=hln_4l, nSD=nSD)
             train_until(model=hln_4n, train_inputs=train_inputs, train_target=train_target,
                         val_inputs=val_inputs, val_target=val_target)
             final_loss = loss(hln_4n(train_inputs), train_target).numpy()
