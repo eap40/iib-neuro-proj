@@ -275,8 +275,8 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
     val_losses = []
     n_points = 1000
     n_train = int(len(train_target.numpy()))
-    last_val_loss1 = 99  # initialise big so training does not stop straight away
-    last_val_loss2 = 100
+    last_val_loss1 = 999  # initialise big so training does not stop straight away
+    last_val_loss2 = 1000
 
     optimizer_adam = tf.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999,
                                               epsilon=1e-07, amsgrad=True)
@@ -297,7 +297,7 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
         # val_losses.append(val_loss)
 
          # check validation loss every 1000 training epochs:
-        if epoch % 500 == 0:
+        if epoch % 1000 == 0:
             # if new loss is bigger than old loss, stop training - stochastic but polling every 1000 epochs should help
             # new: if val loss is increasing across 3 consecutive polls, then stop training
             val_loss = loss(model(val_inputs), val_target)
