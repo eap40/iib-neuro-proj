@@ -282,7 +282,7 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
                                               epsilon=1e-07, amsgrad=True)
 
     # set maximum training epochs at 10000 - stop before if condition satisfied
-    max_epochs = 20000
+    max_epochs = 50000
     for epoch in tqdm(range(max_epochs)):
 
         t_start = int(np.random.uniform(0, n_train - n_points))
@@ -297,7 +297,7 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
         # val_losses.append(val_loss)
 
          # check validation loss every 1000 training epochs:
-        if epoch % 2000 == 0:
+        if epoch % 1000 == 0:
             # if new loss is bigger than old loss, stop training - stochastic but polling every 1000 epochs should help
             # new: if val loss is increasing across 3 consecutive polls, then stop training
             val_loss = loss(model(val_inputs), val_target)
