@@ -6,6 +6,7 @@ from sim_hLN import *
 from init_hLN import *
 from utils import *
 from tqdm import tqdm
+from scipy import signal
 # from plot import *
 
 matplotlib.rcParams["legend.frameon"] = False
@@ -296,17 +297,26 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
         # train_losses.append(train_loss)
         # val_losses.append(val_loss)
 
-         # check validation loss every 1000 training epochs:
-        if epoch % 1000 == 0:
-            # if new loss is bigger than old loss, stop training - stochastic but polling every 1000 epochs should help
-            # new: if val loss is increasing across 3 consecutive polls, then stop training
+         # check validation loss every 100 training epochs and store it :
+        if epoch % 100 == 0:
             val_loss = loss(model(val_inputs), val_target)
-            if (val_loss - last_val_loss1) > 0 and (last_val_loss1 - last_val_loss2) > 0:
-                print(f"Epochs trained:{epoch}")
-                break
-            else:
-                last_val_loss2 = last_val_loss1
-                last_val_loss1 = val_loss
+            val_losses.append(val_loss)
+            # minimum 3000 epochs before we try to determine val loss gradient
+            if epoch >= 3000:
+                # then smooth validation losses by using a moving average across 5 stored datapoints
+                N = 5
+                smoothed_val_losses = np.convolve(val_losses, np.ones((N,))/N, mode='valid')
+
+                # then use the last p smoothed values to decide if the validation loss is increasing, fit a 1d polynomial
+                # by using p=16 and N=5, we take into account val loss over (N+p-1)*100 = 2000 epochs to determine if
+                # the val loss in increasing
+                p = 16
+                lastp = smoothed_val_losses[-p:]
+                m, c = np.polyfit(x=range(p), y=lastp, deg=1)
+                if m > 0:
+                    print(f"Epochs trained:{epoch}")
+                    break
+
 
 
         optimizer_adam.apply_gradients(zip(grads, model.trainable_params))
