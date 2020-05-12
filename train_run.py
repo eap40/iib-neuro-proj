@@ -20,10 +20,10 @@ def run():
             print(e)
 
     # Lets generate some inputs this time
-    E_spikes, I_spikes = gen_realistic_inputs(Tmax=3000)
+    E_spikes, I_spikes = gen_realistic_inputs(Tmax=15000)
     #
-    X_e = spikes_to_input(E_spikes, Tmax=48000)
-    X_i = spikes_to_input(I_spikes, Tmax=48000)
+    X_e = spikes_to_input(E_spikes, Tmax=240000)
+    X_i = spikes_to_input(I_spikes, Tmax=240000)
     X_tot = np.vstack((X_e, X_i))
 
     # X_tot = tf.convert_to_tensor(np.load('Data/real_inputs.npy'), dtype=tf.float32)  # real inputs made earlier
@@ -69,7 +69,7 @@ def run():
     #                                                                                learning_rate=0.001)
 
     # save data
-    np.savez_compressed('/scratch/eap40/valnew_1n', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/valnew_1n2', a=target_params_list, b=trained_params_list, c=inputs)
 
     print("Procedure finished")
 
