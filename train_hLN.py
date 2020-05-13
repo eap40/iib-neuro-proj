@@ -302,7 +302,7 @@ def train_until(model, train_inputs, train_target, val_inputs, val_target):
             val_loss = loss(model(val_inputs), val_target)
             val_losses.append(val_loss)
             # minimum 3000 epochs before we try to determine val loss gradient
-            if epoch >= 3000:
+            if epoch >= 4000:
                 # then smooth validation losses by using a moving average across 5 stored datapoints
                 N = 5
                 smoothed_val_losses = np.convolve(val_losses, np.ones((N,))/N, mode='valid')
