@@ -69,7 +69,7 @@ def run():
     #                                                                                learning_rate=0.001)
 
     # save data
-    np.savez_compressed('/scratch/eap40/valnew_1n4', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/valnew_1n5', a=target_params_list, b=trained_params_list, c=inputs)
 
     print("Procedure finished")
 
@@ -129,8 +129,21 @@ def validate_fit(target_model, num_sims, inputs):
         # start off with 1L model, and train until some performance on validation set
         print("Beginning 1L training")
         hln_1l = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
-        train_until(model=hln_1l, train_inputs=train_inputs, train_target=train_target,
+        n_attempts = 5
+        best_loss_1l = 1e8  # initialise best loss big - only save models if they beat the current best loss
+        for attempt in range(n_attempts):
+            # start 1L training from multiple initial conditions
+            hln_1l.randomise_parameters()
+            train_until(model=hln_1l, train_inputs=train_inputs, train_target=train_target,
                                                     val_inputs=val_inputs, val_target=val_target)
+
+            final_loss = loss(hln_1l(train_inputs), train_target).numpy()
+            if final_loss < best_loss_1l:
+                best_loss_1l = final_loss
+                best_params_1l = [param.numpy() for param in hln_1l.params]
+
+        for i in range(len(hln_1l.params)):
+            hln_1l.params[i].assign(best_params_1l[i])
 
 
         # continue procedure with more complex models: 1N:
