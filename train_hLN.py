@@ -36,7 +36,7 @@ class hLN_Model(object):
         self.Th = tf.Variable(tf.random.uniform(shape=[M], minval=-3, maxval=3, dtype=tf.float32))
         self.Delay = tf.random.uniform(shape=[M], minval=0.1, maxval=5, dtype=tf.float32)
         self.logDelay = tf.Variable(tf.math.log(self.Delay))
-        self.v0 = tf.Variable(tf.random.uniform(shape=(), minval=-0.1, maxval=0.1, dtype=tf.float32))
+        self.v0 = tf.Variable(tf.random.uniform(shape=(), minval=-55, maxval=-45, dtype=tf.float32))
         self.params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
                        self.Th, self.logDelay)
         self.trainable_params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
@@ -71,7 +71,7 @@ class hLN_Model(object):
         self.Th.assign(tf.random.uniform(shape=[M], minval=-3, maxval=3, dtype=tf.float32))
         self.Delay = tf.random.uniform(shape=[M], minval=0.1, maxval=5, dtype=tf.float32)
         self.logDelay.assign(tf.math.log(self.Delay))
-        self.v0.assign(tf.random.uniform(shape=(), minval=-0.1, maxval=0.1, dtype=tf.float32))
+        self.v0.assign(tf.random.uniform(shape=(), minval=-55, maxval=-45, dtype=tf.float32))
         self.params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,
                        self.Th, self.logDelay)
         self.trainable_params = (self.v0, self.logJw, self.Wwe, self.Wwi, self.logTaue, self.logTaui,

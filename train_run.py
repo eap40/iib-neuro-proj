@@ -69,7 +69,7 @@ def run():
                                                                                    learning_rate=0.001)
 
     # save data
-    np.savez_compressed('/scratch/eap40/tr_1l_report', a=train_accs, b=test_accs, c=trained_plist, d=target_plist,
+    np.savez_compressed('/scratch/eap40/tr_1l2_report', a=train_accs, b=test_accs, c=trained_plist, d=target_plist,
                         e=inputs)
 
     print("Procedure finished")
