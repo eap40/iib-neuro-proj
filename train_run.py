@@ -49,7 +49,7 @@ def run():
     hln_1l_tied = hLN_TiedModel(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
 
     # validate_fit function
-    target_params_list, trained_params_list = validate_fit(target_model=hln_2n, num_sims=5, inputs=inputs)
+    target_params_list, trained_params_list = validate_fit(target_model=hln_3n, num_sims=5, inputs=inputs)
 
     # validate_fit_data function
     # target_params_list, trained_params_list = validate_fit_data(target_model=hln_1l, num_sims=5, inputs=inputs)
@@ -69,7 +69,7 @@ def run():
     #                                                                                learning_rate=0.001)
 
     # save data
-    np.savez_compressed('/scratch/eap40/valnew_2n_bigv', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/valnew_3n', a=target_params_list, b=trained_params_list, c=inputs)
 
 
     print("Procedure finished")
