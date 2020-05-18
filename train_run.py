@@ -48,8 +48,13 @@ def run():
                                                                              True, True, True, True]))
     hln_1l_tied = hLN_TiedModel(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
 
+    Wce_sing, Wci_sing = np.array([np.array([0], dtype=np.int32)], dtype=np.int32), np.array(
+        [np.array([], dtype=np.int32)], dtype=np.int32)
+
+    hln_ss = hLN_Model(Jc=Jc_1l, Wce=Wce_sing, Wci=Wci_sing, sig_on=tf.constant([False]))
+
     # validate_fit function
-    target_params_list, trained_params_list = validate_fit(target_model=hln_3n, num_sims=5, inputs=inputs)
+    # target_params_list, trained_params_list = validate_fit(target_model=hln_3n, num_sims=5, inputs=inputs)
 
     # validate_fit_data function
     # target_params_list, trained_params_list = validate_fit_data(target_model=hln_1l, num_sims=5, inputs=inputs)
@@ -63,13 +68,17 @@ def run():
     #                                                                               num_epochs=5000, learning_rate=0.001)
 
     # test_recovery routine
-    # train_accs, test_accs, trained_plist, target_plist = test_recovery(model=hln_1l,
+    # train_accs, test_accs, trained_plist, target_plist = test_recovery(model=hln_ss,
     #                                                                                inputs=inputs, num_sims=20,
     #                                                                                n_attempts=1, num_epochs=30000,
     #                                                                                learning_rate=0.001)
 
+    # data vs error routine
+
+    test_accs = data_vs_accuracy(target_model=hln_1l, inputs=inputs, num_sims=5)
+
     # save data
-    np.savez_compressed('/scratch/eap40/valnew_3n', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/data_vs_acc_1l', a=test_accs)
 
 
     print("Procedure finished")
@@ -668,6 +677,56 @@ def debug_training(target_model, inputs, nSD):
 
     return target_params, trained_params, train_losses, val_losses
 
+
+
+def data_vs_accuracy(target_model, inputs, num_sims):
+    """Function to test model performance as data level is varied. Takes a target model, long set of inputs, and
+    number of simulations to be carried out at each data level"""
+
+    # number of time points in long inputs
+    L_max = inputs.shape[1]
+
+    # define fractions of data we want to use
+    n_trials = 5
+    fracs = np.arange(1, n_trials + 1)/n_trials
+
+    test_accs = []
+
+    for frac in fracs:
+        frac_inputs = inputs[:, :int(L_max*frac)]
+
+        # split input data into training, validation and test sets
+        L = frac_inputs.shape[1]
+        train_split = 0.7
+        n_train = int(L * train_split)
+        train_inputs = frac_inputs[:, :n_train]
+        val_split = 0.1
+        n_val = int(L * val_split)
+        val_inputs = frac_inputs[:, n_train:n_train + n_val]
+        n_test = L - n_train - n_val
+        test_inputs = frac_inputs[:, -n_test:]
+
+        test_accs_frac = []
+
+        for sim in range(num_sims):
+
+            target_model.randomise_parameters()
+            train_target = target_model(train_inputs)
+            val_target = target_model(val_inputs)
+            test_target = target_model(test_inputs)
+
+            # train model as best we can - need custom code for each model right now
+            target_model.randomise_parameters()
+            train_until(model=target_model, train_inputs=train_inputs, train_target=train_target,
+                        val_inputs=val_inputs, val_target=val_target)
+
+            test_out = target_model(test_inputs)
+            test_acc = 100 * (1 - loss(test_out, test_target) / np.var(test_target))
+            test_accs_frac.append(test_acc)
+
+        test_accs.append(test_accs_frac)
+
+    return test_accs
 
 
 
