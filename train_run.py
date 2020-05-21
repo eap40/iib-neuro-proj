@@ -46,6 +46,10 @@ def run():
     hln_2n = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
     hln_3n = hLN_Model(Jc=Jc_3n, Wce=Wce_3n, Wci=Wci_3n, sig_on=tf.constant([True, True, True,
                                                                              True, True, True, True]))
+    hln_4n = hLN_Model(Jc=Jc_4n, Wce=Wce_4n, Wci=Wci_4n, sig_on=tf.constant([True, True, True, True, True, True, True,
+                                                                             True, True, True, True, True, True, True,
+                                                                             True]))
+
     hln_1l_tied = hLN_TiedModel(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
 
     Wce_sing, Wci_sing = np.array([np.array([0], dtype=np.int32)], dtype=np.int32), np.array(
@@ -54,7 +58,7 @@ def run():
     hln_ss = hLN_Model(Jc=Jc_1l, Wce=Wce_sing, Wci=Wci_sing, sig_on=tf.constant([False]))
 
     # validate_fit function
-    # target_params_list, trained_params_list = validate_fit(target_model=hln_3n, num_sims=5, inputs=inputs)
+    target_params_list, trained_params_list = validate_fit(target_model=hln_4n, num_sims=5, inputs=inputs)
 
     # validate_fit_data function
     # target_params_list, trained_params_list = validate_fit_data(target_model=hln_1l, num_sims=5, inputs=inputs)
@@ -74,11 +78,10 @@ def run():
     #                                                                                learning_rate=0.001)
 
     # data vs error routine
-
-    test_accs = data_vs_accuracy(target_model=hln_1l, inputs=inputs, num_sims=5)
+    # test_accs = data_vs_accuracy(target_model=hln_1l, inputs=inputs, num_sims=5)
 
     # save data
-    np.savez_compressed('/scratch/eap40/data_vs_acc_1l', a=test_accs)
+    np.savez_compressed('/scratch/eap40/valnew_4n', a=target_params_list, b=trained_params_list, c=inputs)
 
 
     print("Procedure finished")
@@ -683,12 +686,25 @@ def data_vs_accuracy(target_model, inputs, num_sims):
     """Function to test model performance as data level is varied. Takes a target model, long set of inputs, and
     number of simulations to be carried out at each data level"""
 
+    ### Define the different hLN architectures we will be using:
+    # 1L
+    Jc_1l = np.array([0])
+    # 1N
+
+    # list of lists for to define hierarchical clustering
+    clusts = [[[[[0, 1], [2]], [[3, 4], [5, 6]]], [[[7, 8], [9]], [[10, 11], [12]]]]]
+
+    Wce_1l, Wci_1l = create_weights(Jc_1l, n_levels=1, clusts=clusts)
+
+
     # number of time points in long inputs
     L_max = inputs.shape[1]
 
     # define fractions of data we want to use
     n_trials = 5
     fracs = np.arange(1, n_trials + 1)/n_trials
+
+    nSDs = [4, 8]
 
     test_accs = []
 
@@ -716,11 +732,44 @@ def data_vs_accuracy(target_model, inputs, num_sims):
             test_target = target_model(test_inputs)
 
             # train model as best we can - need custom code for each model right now
-            target_model.randomise_parameters()
-            train_until(model=target_model, train_inputs=train_inputs, train_target=train_target,
-                        val_inputs=val_inputs, val_target=val_target)
+            # start off with 1L model, and train until some performance on validation set
+            print("Beginning 1L training")
+            hln_1l = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
+            n_attempts = 5
+            best_loss_1l = 1e8  # initialise best loss big - only save models if they beat the current best loss
+            for attempt in range(n_attempts):
+                # start 1L training from multiple initial conditions
+                hln_1l.randomise_parameters()
+                train_until(model=hln_1l, train_inputs=train_inputs, train_target=train_target,
+                            val_inputs=val_inputs, val_target=val_target)
 
-            test_out = target_model(test_inputs)
+                final_loss = loss(hln_1l(train_inputs), train_target).numpy()
+                if final_loss < best_loss_1l:
+                    best_loss_1l = final_loss
+                    best_params_1l = [param.numpy() for param in hln_1l.params]
+
+            for i in range(len(hln_1l.params)):
+                hln_1l.params[i].assign(best_params_1l[i])
+
+            # continue procedure with more complex models: 1N:
+            print("1L training finished, beginning 1N training")
+            hln_1n = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([True]))
+            best_loss_1n = 1000  # initialise best loss big - only save models if they beat the current best loss
+            best_params_1n = [param.numpy() for param in hln_1n.params]
+            for nSD in nSDs:
+                init_nonlin(X=train_inputs, model=hln_1n, lin_model=hln_1l, nSD=nSD)
+                train_until(model=hln_1n, train_inputs=train_inputs, train_target=train_target,
+                            val_inputs=val_inputs, val_target=val_target)
+                final_loss = loss(hln_1n(train_inputs), train_target).numpy()
+                if final_loss < best_loss_1n:
+                    best_loss_1n = final_loss
+                    best_params_1n = [param.numpy() for param in hln_1n.params]
+
+            for i in range(len(hln_1n.params)):
+                hln_1n.params[i].assign(best_params_1n[i])
+
+
+            test_out = hln_1n(test_inputs)
             test_acc = 100 * (1 - loss(test_out, test_target) / np.var(test_target))
             test_accs_frac.append(test_acc)
 
