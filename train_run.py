@@ -78,10 +78,10 @@ def run():
     #                                                                                learning_rate=0.001)
 
     # data vs error routine
-    # test_accs = data_vs_accuracy(target_model=hln_1l, inputs=inputs, num_sims=5)
+    test_accs = data_vs_accuracy(target_model=hln_1n, inputs=inputs, num_sims=5)
 
     # save data
-    np.savez_compressed('/scratch/eap40/valnew_4n', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/data_vs_acc_1l', a=test_accs)
 
 
     print("Procedure finished")
