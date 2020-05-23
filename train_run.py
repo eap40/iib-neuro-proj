@@ -58,7 +58,7 @@ def run():
     hln_ss = hLN_Model(Jc=Jc_1l, Wce=Wce_sing, Wci=Wci_sing, sig_on=tf.constant([False]))
 
     # validate_fit function
-    target_params_list, trained_params_list = validate_fit(target_model=hln_4n, num_sims=5, inputs=inputs)
+    target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=5, inputs=inputs)
 
     # validate_fit_data function
     # target_params_list, trained_params_list = validate_fit_data(target_model=hln_1l, num_sims=5, inputs=inputs)
@@ -78,10 +78,10 @@ def run():
     #                                                                                learning_rate=0.001)
 
     # data vs error routine
-    test_accs = data_vs_accuracy(target_model=hln_1n, inputs=inputs, num_sims=5)
+    # test_accs = data_vs_accuracy(target_model=hln_1n, inputs=inputs, num_sims=5)
 
     # save data
-    np.savez_compressed('/scratch/eap40/data_vs_acc_1l', a=test_accs)
+    np.savez_compressed('/scratch/eap40/valnew_1l', a=target_params_list, b=trained_params_list, c=inputs)
 
 
     print("Procedure finished")
