@@ -58,7 +58,7 @@ def run():
     hln_ss = hLN_Model(Jc=Jc_1l, Wce=Wce_sing, Wci=Wci_sing, sig_on=tf.constant([False]))
 
     # validate_fit function
-    target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=5, inputs=inputs)
+    # target_params_list, trained_params_list = validate_fit(target_model=hln_1l, num_sims=5, inputs=inputs)
 
     # validate_fit_data function
     # target_params_list, trained_params_list = validate_fit_data(target_model=hln_1l, num_sims=5, inputs=inputs)
@@ -78,10 +78,10 @@ def run():
     #                                                                                learning_rate=0.001)
 
     # data vs error routine
-    # test_accs = data_vs_accuracy(target_model=hln_1n, inputs=inputs, num_sims=5)
+    test_accs = data_vs_accuracy(target_model=hln_1n, inputs=inputs, num_sims=5)
 
     # save data
-    np.savez_compressed('/scratch/eap40/valnew_1l', a=target_params_list, b=trained_params_list, c=inputs)
+    np.savez_compressed('/scratch/eap40/data_vs_acc_1n', a=test_accs)
 
 
     print("Procedure finished")
@@ -735,7 +735,7 @@ def data_vs_accuracy(target_model, inputs, num_sims):
             # start off with 1L model, and train until some performance on validation set
             print("Beginning 1L training")
             hln_1l = hLN_Model(Jc=Jc_1l, Wce=Wce_1l, Wci=Wci_1l, sig_on=tf.constant([False]))
-            n_attempts = 5
+            n_attempts = 1
             best_loss_1l = 1e8  # initialise best loss big - only save models if they beat the current best loss
             for attempt in range(n_attempts):
                 # start 1L training from multiple initial conditions
