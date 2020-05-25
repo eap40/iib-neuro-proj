@@ -78,10 +78,10 @@ def run():
     #                                                                                learning_rate=0.001)
 
     # data vs error routine
-    test_accs = data_vs_accuracy(target_model=hln_2n, inputs=inputs, num_sims=5)
+    test_accs = data_vs_accuracy(target_model=hln_1n, inputs=inputs, num_sims=3)
 
     # save data
-    np.savez_compressed('/scratch/eap40/data_vs_acc_2n', a=test_accs)
+    np.savez_compressed('/scratch/eap40/data_vs_acc_1n2', a=test_accs)
 
 
     print("Procedure finished")
@@ -702,7 +702,7 @@ def data_vs_accuracy(target_model, inputs, num_sims):
     L_max = inputs.shape[1]
 
     # define fractions of data we want to use
-    n_trials = 5
+    n_trials = 10
     fracs = np.arange(1, n_trials + 1)/n_trials
 
     nSDs = [4, 8]
@@ -769,27 +769,27 @@ def data_vs_accuracy(target_model, inputs, num_sims):
             for i in range(len(hln_1n.params)):
                 hln_1n.params[i].assign(best_params_1n[i])
 
-            # continue procedure with more complex models: 2N:
-            print("1N training finished, beginning 2N training")
-            hln_2l = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, False, False]))
-            update_arch(prev_model=hln_1n, next_model=hln_2l)
-            hln_2n = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
-            best_loss_2n = 1000  # initialise best loss big - only save models if they beat the current best loss
-            best_params_2n = [param.numpy() for param in hln_2n.params]
-            for nSD in nSDs:
-                init_nonlin(X=train_inputs, model=hln_2n, lin_model=hln_2l, nSD=nSD)
-                train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
-                            val_inputs=val_inputs, val_target=val_target)
-                final_loss = loss(hln_2n(train_inputs), train_target).numpy()
-                if final_loss < best_loss_2n:
-                    best_loss_2n = final_loss
-                    best_params_2n = [param.numpy() for param in hln_2n.params]
+            # # continue procedure with more complex models: 2N:
+            # print("1N training finished, beginning 2N training")
+            # hln_2l = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, False, False]))
+            # update_arch(prev_model=hln_1n, next_model=hln_2l)
+            # hln_2n = hLN_Model(Jc=Jc_2n, Wce=Wce_2n, Wci=Wci_2n, sig_on=tf.constant([True, True, True]))
+            # best_loss_2n = 1000  # initialise best loss big - only save models if they beat the current best loss
+            # best_params_2n = [param.numpy() for param in hln_2n.params]
+            # for nSD in nSDs:
+            #     init_nonlin(X=train_inputs, model=hln_2n, lin_model=hln_2l, nSD=nSD)
+            #     train_until(model=hln_2n, train_inputs=train_inputs, train_target=train_target,
+            #                 val_inputs=val_inputs, val_target=val_target)
+            #     final_loss = loss(hln_2n(train_inputs), train_target).numpy()
+            #     if final_loss < best_loss_2n:
+            #         best_loss_2n = final_loss
+            #         best_params_2n = [param.numpy() for param in hln_2n.params]
+            #
+            # for i in range(len(hln_2n.params)):
+            #     hln_2n.params[i].assign(best_params_2n[i])
 
-            for i in range(len(hln_2n.params)):
-                hln_2n.params[i].assign(best_params_2n[i])
 
-
-            test_out = hln_2n(test_inputs)
+            test_out = hln_1n(test_inputs)
             test_acc = 100 * (1 - loss(test_out, test_target) / np.var(test_target))
             test_accs_frac.append(test_acc)
 
